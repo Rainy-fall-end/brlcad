@@ -40,6 +40,25 @@ BRLCAD_ADDDATA(rtexample.c sample_applications)
 
 BRLCAD_ADDEXEC(rtexample "rtexample.c" "librt;libdm;liboptical;libicv" NO_INSTALL)
 
+# Check for and install the torch package
+execute_process(COMMAND ${Python_EXECUTABLE} -m pip show torch RESULT_VARIABLE TORCH_FOUND)
+if(NOT TORCH_FOUND)
+    execute_process(COMMAND ${Python_EXECUTABLE} -m pip install torch)
+endif()
+
+# Check for and install the torchvision package
+execute_process(COMMAND ${Python_EXECUTABLE} -m pip show torchvision RESULT_VARIABLE TORCHVISION_FOUND)
+if(NOT TORCHVISION_FOUND)
+    execute_process(COMMAND ${Python_EXECUTABLE} -m pip install torchvision)
+endif()
+
+
+BRLCAD_ADDEXEC(rt_trainneural "view.c;grid.c;heatgraph.c;scanline.c;opt.c;do.c;worker.c;usage.cpp;rt_neural.cpp;train_neural.c;../libanalyze/util.cpp;" "Threads::Threads;librt;libdm;libnmg;libdm;liboptical;libicv;liboptical;libicv;${Python_LIBRARIES};${RT_STD_LIBS};${OPEN_CL_LIBS}" FOLDER Rt)
+target_include_directories(rt_trainneural PRIVATE
+    ${CMAKE_SOURCE_DIR}/include/analyze
+)
+ADD_TARGET_DEPS(rt_trainneural dm_plugins dm-txt)
+
 BRLCAD_ADDEXEC(reshoot "reshoot.c" "Threads::Threads;librt;libdm;liboptical;libicv" FOLDER Rt)
 target_include_directories(reshoot BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
