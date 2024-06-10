@@ -97,7 +97,7 @@ memory_summary(void)
 {
 	if (rt_verbosity & VERBOSE_STATS) {
 		size_t mdelta = bu_n_malloc - n_malloc;
-		size_t fdelta = bu_n_free - n_free;
+		size_t fdelta = bu_n_free - n_free; 
 		bu_log("Additional #malloc=%zu, #free=%zu, #realloc=%zu (%zu retained)\n",
 			mdelta,
 			fdelta,
