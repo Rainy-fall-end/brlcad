@@ -27,5 +27,7 @@
 #define BRL_CAD_RT_NEURAL_CPP
 #include"rt/rt_neural.h"
 
+
+
 #endif // !BRL_CAD_RT_NEURAL_CPP
 
