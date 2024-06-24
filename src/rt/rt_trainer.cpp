@@ -11,8 +11,9 @@
 #include "bv/plot3.h"
 #include "photonmap.h"
 #include "scanline.h"
+#include <fstream>
+#include <string>
 
-#include "./rtuif.h"
 #include "./ext.h"
 
 extern "C"
@@ -22,7 +23,14 @@ extern "C"
 	extern double haze[3];		/* from opt.c */
 	extern int do_kut_plane;        /* from opt.c */
 	extern plane_t kut_plane;       /* from opt.c */
+	extern int view_init(struct application* ap, char* file, char* obj, int minus_o, int minus_F);
+	extern int fb_setup(void);
 }
+
+/***** Variables shared with viewing model *** */
+struct fb* fbp = FB_NULL;	/* Framebuffer handle */
+
+
 struct soltab* kut_soltab = NULL;
 int ambSlow = 0;
 int ambSamples = 0;
@@ -32,27 +40,104 @@ vect_t ambient_color = { 1, 1, 1 };	/* Ambient white light */
 int ibackground[3] = { 0 };		/* integer 0..255 version */
 int inonbackground[3] = { 0 };		/* integer non-background */
 fastf_t gamma_corr = 0.0;		/* gamma correction if !0 */
-TrainData::TrainData(struct rt_i* rtip) : m_rt_i(rtip) {}
+
+TrainData::TrainData(struct rt_i* rtip) : m_rt_i(rtip) 
+{
+	char idbuf[2048] = { 0 };	/* First ID record info */
+
+	if (width <= 0 && cell_width <= 0)
+		width = 512;
+	if (height <= 0 && cell_height <= 0)
+		height = 512;
+	int fb_status = fb_setup();
+	if (fb_status) {
+		fb_log("fail to open fb");
+	}
+}
+
+TrainData::TrainData(const char* database_name, const char* object_name)
+{
+	char idbuf[2048] = { 0 };	/* First ID record info */
+
+	if ((this->m_rt_i = rt_dirbuild(database_name, idbuf, sizeof(idbuf))) == RTI_NULL) {
+		bu_exit(2, "Error building dir in train neural!\n");
+	}
+
+	if (width <= 0 && cell_width <= 0)
+		width = 512;
+	if (height <= 0 && cell_height <= 0)
+		height = 512;
+	int fb_status = fb_setup();
+	if (fb_status) {
+		fb_log("fail to open fb");
+	}
+	view_init(&APP, (char*)database_name, (char*)object_name, outputfile != (char*)0, framebuffer != (char*)0);
+}
 
 std::vector<RGBpixel> TrainData::ShootSamples(const RayParam& ray_list) {
-    struct application ap;
+	struct application ap;
 
-    RT_APPLICATION_INIT(&ap);
-    ap.a_rt_i = this->m_rt_i;
-    // ap.a_hit = hit;
-    // ap.a_miss = miss;
-    ap.a_onehit = 1;
-    ap.a_logoverlap = rt_silent_logoverlap;
+	RT_APPLICATION_INIT(&ap);
+	ap.a_rt_i = this->m_rt_i;
+	ap.a_hit = colorview;
+	ap.a_miss = hit_nothing;
+	ap.a_onehit = 1;
+	ap.a_logoverlap = rt_silent_logoverlap;
 	std::vector<RGBpixel> res;
+
 	return res;
 }
 
 void TrainData::ClearRes()
 {
-    m_res.clear();
+	m_res.clear();
 }
 
-TrainData::~TrainData() {}
+TrainData::~TrainData() 
+{
+	fb_close(fbp);
+}
+
+void create_plot(const char* db_name, const RayParam& rays)
+{
+	std::ofstream command_file;
+	command_file.open("C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" + std::string(db_name) + ".mged");
+	if (command_file.is_open())
+	{
+		for (int i = 1; i < rays.size() + 1; ++i)
+		{
+			command_file << "in point" << i << ".s " << "sph " << rays[i - 1].first[0] << " ";
+			command_file << rays[i - 1].first[1] << " ";
+			command_file << rays[i - 1].first[2] << " ";
+			command_file << "0.1" << std::endl;
+		}
+		command_file << "r all_points.g ";
+		for (int i = 1; i < rays.size() + 1; ++i)
+		{
+			command_file << "u point" << i << ".s ";
+		}
+		command_file << "B all_points.g";
+	}
+	else
+	{
+		bu_log("fail to open/create file");
+	}
+	command_file.close();
+	std::ofstream draw_file;
+	draw_file.open("C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" + std::string(db_name) + ".bat");
+	if (draw_file.is_open())
+	{
+		draw_file << "@echo off" << std::endl;
+		draw_file << "cd \"C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\"" << std::endl;
+		draw_file << "mged.exe " << "\"C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\" + std::string(db_name) << ".g\"" << "<" << "\"C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" << std::string(db_name) << ".mged\"" << std::endl;
+		draw_file << "archer.exe " << "\"C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\" + std::string(db_name) << ".g\"";
+	}
+	else
+	{
+		bu_log("fail to open/create file");
+	}
+}
+
 
 static int
 hit_nothing(struct application* ap)
@@ -127,7 +212,6 @@ hit_nothing(struct application* ap)
 	VMOVE(ap->a_color, background);	/* In case someone looks */
 	return 0;
 }
-
 
 int
 colorview(struct application* ap, struct partition* PartHeadp, struct seg* finished_segs)
@@ -537,3 +621,54 @@ ao_raymiss(register struct application* ap)
 	ap->a_flag = 0;
 	return 0;
 }
+//
+//int fb_setup(void) {
+//	/* Framebuffer is desired */
+//	size_t xx, yy;
+//	int zoom;
+//
+//	/* make sure width/height are set via -g/-G */
+//	grid_sync_dimensions(viewsize);
+//
+//	/* Ask for a fb big enough to hold the image, at least 512. */
+//	/* This is so MGED-invoked "postage stamps" get zoomed up big
+//	 * enough to see.
+//	 */
+//	xx = yy = 512;
+//	if (xx < width || yy < height) {
+//		xx = width;
+//		yy = height;
+//	}
+//
+//	bu_semaphore_acquire(BU_SEM_SYSCALL);
+//	fbp = fb_open(framebuffer, xx, yy);
+//	bu_semaphore_release(BU_SEM_SYSCALL);
+//	if (fbp == FB_NULL) {
+//		fprintf(stderr, "rt:  can't open frame buffer\n");
+//		return 12;
+//	}
+//
+//	bu_semaphore_acquire(BU_SEM_SYSCALL);
+//	/* If fb came out smaller than requested, do less work */
+//	size_t fbwidth = (size_t)fb_getwidth(fbp);
+//	size_t fbheight = (size_t)fb_getheight(fbp);
+//	if (width > fbwidth)
+//		width = fbwidth;
+//	if (height > fbheight)
+//		height = fbheight;
+//
+//	/* If fb is lots bigger (>= 2X), zoom up & center */
+//	if (width > 0 && height > 0) {
+//		zoom = fbwidth / width;
+//		if (fbheight / height < (size_t)zoom) {
+//			zoom = fb_getheight(fbp) / height;
+//		}
+//		(void)fb_view(fbp, width / 2, height / 2, zoom, zoom);
+//	}
+//	bu_semaphore_release(BU_SEM_SYSCALL);
+//
+//#ifdef USE_OPENCL
+//	clt_connect_fb(fbp);
+//#endif
+//	return 0;
+//}

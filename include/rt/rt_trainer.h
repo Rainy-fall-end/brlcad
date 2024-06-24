@@ -22,6 +22,7 @@
 #include<vmath.h>
 #include<vector>
 #include<dm.h>
+
 static int
 hit_nothing(struct application* ap);
 
@@ -42,11 +43,12 @@ ao_rayhit(register struct application* ap,
 int
 ao_raymiss(register struct application* ap);
 
-typedef std::vector<std::pair<point_t, point_t>> RayParam;
+typedef std::vector<std::pair< pointp_t, pointp_t>> RayParam;
 class TrainData
 {
 public:
 	TrainData(struct rt_i* rtip);
+	TrainData(const char* database_name, const char* object_name);
 	std::vector<RGBpixel> ShootSamples(const RayParam& ray_list);
 	void ClearRes();
 	~TrainData();
@@ -54,6 +56,8 @@ private:
 	struct rt_i* m_rt_i;
 	std::vector<bool> m_res;
 };
+
+void create_plot(const char* db_name, const RayParam& rays);
 
 
 #endif // !RT_RT_TRAINER_H

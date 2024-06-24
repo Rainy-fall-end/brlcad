@@ -53,9 +53,10 @@ if(NOT TORCHVISION_FOUND)
 endif()
 
 
-BRLCAD_ADDEXEC(rt_trainneural "view.c;grid.c;heatgraph.c;scanline.c;opt.c;do.c;worker.c;usage.cpp;rt_neural.cpp;rt_trainer.cpp;train_neural.c;../libanalyze/util.cpp;" "Threads::Threads;librt;libdm;libnmg;libdm;liboptical;libicv;liboptical;libicv;${Python_LIBRARIES};${RT_STD_LIBS};${OPEN_CL_LIBS}" FOLDER Rt)
+BRLCAD_ADDEXEC(rt_trainneural "view.c;grid.c;heatgraph.c;scanline.c;opt.c;do.c;worker.c;usage.cpp;rt_neural.cpp;rt_trainer.cpp;train_neural.cpp;neural.c;../libanalyze/util.cpp;" "Threads::Threads;librt;libdm;libnmg;libdm;liboptical;libicv;liboptical;libicv;${Python_LIBRARIES};${RT_STD_LIBS};${OPEN_CL_LIBS}" FOLDER Rt)
 target_include_directories(rt_trainneural PRIVATE
     ${CMAKE_SOURCE_DIR}/include/analyze
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 ADD_TARGET_DEPS(rt_trainneural dm_plugins dm-txt)
 

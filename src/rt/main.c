@@ -248,9 +248,11 @@ int main(int argc, char *argv[])
 		printf("Argument %d is %s\n", i_, argv[i_]);
 	argv[1] = "-s";
 	argv[2] = "512";
-	argv[3] = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\world.g";
-	argv[4] = "all.g";
-	argc = 5;
+	argv[3] = "-P";
+	argv[4] = "1";
+	argv[5] = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";
+	argv[6] = "all.g";
+	argc = 7;
 	int ret = 0;
     int need_fb = 0;
     struct rt_i *rtip = NULL;

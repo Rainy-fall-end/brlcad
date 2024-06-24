@@ -1,27 +1,3 @@
-/*                          T R A I N _ N E U R A L. C P P
- * BRL-CAD
- *
- * Copyright (c) 1985-2024 United States Government as represented by
- * the U.S. Army Research Laboratory.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public License
- * version 2.1 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this file; see the file named COPYING for more
- * information.
- */
- /** @file rt/train_neural.cpp
-  *
-  *
-  */
-
 #include "common.h"
 
 #include <stdlib.h>
@@ -38,6 +14,7 @@
 
 #include "bu/app.h"
 #include "bu/bitv.h"
+#include "bu/cv.h"
 #include "bu/debug.h"
 #include "bu/endian.h"
 #include "bu/getopt.h"
@@ -52,15 +29,10 @@
 #include "dm.h"
 #include "pkg.h"
 
-  /* private */
+/* private */
 #include "./rtuif.h"
 #include "./ext.h"
 #include "brlcad_ident.h"
-
-
-extern void application_init(void);
-
-extern const char title[];
 
 
 /***** Variables shared with viewing model *** */
@@ -91,13 +63,14 @@ extern int	desiredframe;		/* frame to start at */
 extern int	curframe;		/* current frame number,
 					 * also shared with view.c */
 extern char* outputfile;		/* name of base of output file */
+/***** end variables shared with do.c *****/
 
 void
 memory_summary(void)
 {
 	if (rt_verbosity & VERBOSE_STATS) {
 		size_t mdelta = bu_n_malloc - n_malloc;
-		size_t fdelta = bu_n_free - n_free; 
+		size_t fdelta = bu_n_free - n_free;
 		bu_log("Additional #malloc=%zu, #free=%zu, #realloc=%zu (%zu retained)\n",
 			mdelta,
 			fdelta,
@@ -109,7 +82,58 @@ memory_summary(void)
 	n_realloc = bu_n_realloc;
 }
 
-int main(int argc, char* argv[])
-{
+int fb_setup(void) {
+	/* Framebuffer is desired */
+	size_t xx, yy;
+	int zoom;
+
+	/* make sure width/height are set via -g/-G */
+	grid_sync_dimensions(viewsize);
+
+	/* Ask for a fb big enough to hold the image, at least 512. */
+	/* This is so MGED-invoked "postage stamps" get zoomed up big
+	 * enough to see.
+	 */
+	xx = yy = 512;
+	if (xx < width || yy < height) {
+		xx = width;
+		yy = height;
+	}
+
+	bu_semaphore_acquire(BU_SEM_SYSCALL);
+	fbp = fb_open(framebuffer, xx, yy);
+	bu_semaphore_release(BU_SEM_SYSCALL);
+	if (fbp == FB_NULL) {
+		fprintf(stderr, "rt:  can't open frame buffer\n");
+		return 12;
+	}
+
+	bu_semaphore_acquire(BU_SEM_SYSCALL);
+	/* If fb came out smaller than requested, do less work */
+	size_t fbwidth = (size_t)fb_getwidth(fbp);
+	size_t fbheight = (size_t)fb_getheight(fbp);
+	if (width > fbwidth)
+		width = fbwidth;
+	if (height > fbheight)
+		height = fbheight;
+
+	/* If fb is lots bigger (>= 2X), zoom up & center */
+	if (width > 0 && height > 0) {
+		zoom = fbwidth / width;
+		if (fbheight / height < (size_t)zoom) {
+			zoom = fb_getheight(fbp) / height;
+		}
+		(void)fb_view(fbp, width / 2, height / 2, zoom, zoom);
+	}
+	bu_semaphore_release(BU_SEM_SYSCALL);
+
+#ifdef USE_OPENCL
+	clt_connect_fb(fbp);
+#endif
 	return 0;
 }
+
+
+
+
+
