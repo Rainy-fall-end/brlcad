@@ -243,9 +243,6 @@ static void mpi_exit_func(void)
 
 int main(int argc, char *argv[])
 {
-	int i_ = 0;
-	for (i_ = 0; i_ < argc; i_++)
-		printf("Argument %d is %s\n", i_, argv[i_]);
 	argv[1] = "-s";
 	argv[2] = "512";
 	argv[3] = "-P";

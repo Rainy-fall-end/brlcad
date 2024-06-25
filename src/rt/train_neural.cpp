@@ -24,11 +24,11 @@
 #include"rt/rt_trainer.h"
 int main(int argc, char* argv[])
 {
-	const char* db = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\world.g";
+	const char* db = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";
 	const char* ob = "all.g";
 
 	TrainData td(db, ob);
-	point_t dir = { 1,0,0 };
+	vect_t dir = { 1,0,0 };
 	
 	point_t p1 = { 1,1,1 };
 
@@ -37,11 +37,14 @@ int main(int argc, char* argv[])
 	point_t p3 = { 1,1,2 };
 
 	RayParam test;
-	test.push_back(std::make_pair(p1, dir));
+	/*test.push_back(std::make_pair(p1, dir));
 
 	test.push_back(std::make_pair(p2, dir));
 
-	test.push_back(std::make_pair(p3, dir));
-	create_plot("moss", test);
+	test.push_back(std::make_pair(p3, dir));*/
+	// test = rt_sample::SampleRandom(10);
+
+	test = rt_sample::UniformSphere(100);
+	create_plot("moss", test,"all_points1.g");
 	return 0;
 }
