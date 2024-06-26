@@ -90,13 +90,17 @@ TrainData::TrainData(const char* database_name, const char* object_name)
 	def_tree(APP.a_rt_i);
 	const char* trees[] = { "all.g" };
 	rt_gettrees(APP.a_rt_i, 1, trees, (size_t)npsw);
+
 	view_init(&APP, (char*)database_name, (char*)object_name, outputfile != (char*)0, framebuffer != (char*)0);
+
 	do_ae(azimuth, elevation);
 	int fb_status = fb_setup();
 	if (fb_status) {
 		fb_log("fail to open fb");
+		return;
 	}
 	do_prep(this->m_rt_i);
+	view_2init(&APP, "");
 }
 
 std::vector<RGBpixel> TrainData::ShootSamples(const RayParam& ray_list) {
@@ -120,47 +124,48 @@ TrainData::~TrainData()
 {
 	fb_close(fbp);
 }
-
-void create_plot(const char* db_name, const RayParam& rays, const char* plot_name)
+namespace util
 {
-	std::ofstream command_file;
-	command_file.open("C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" + std::string(db_name) + ".mged");
-	if (command_file.is_open())
+	void create_plot(const char* db_name, const RayParam& rays, const char* plot_name)
 	{
-		for (int i = 1; i < rays.size() + 1; ++i)
+		std::ofstream command_file;
+		command_file.open("C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" + std::string(db_name) + ".mged");
+		if (command_file.is_open())
 		{
-			command_file << "in " << std::string(plot_name) << "point" << i << ".s " << "sph " << rays[i - 1].first[0] << " ";
-			command_file << rays[i - 1].first[1] << " ";
-			command_file << rays[i - 1].first[2] << " ";
-			command_file << "1" << std::endl;
+			for (int i = 1; i < rays.size() + 1; ++i)
+			{
+				command_file << "in " << std::string(plot_name) << "point" << i << ".s " << "sph " << rays[i - 1].first[0] << " ";
+				command_file << rays[i - 1].first[1] << " ";
+				command_file << rays[i - 1].first[2] << " ";
+				command_file << "1" << std::endl;
+			}
+			command_file << "r " << std::string(plot_name) << " ";
+			for (int i = 1; i < rays.size() + 1; ++i)
+			{
+				command_file << "u " << std::string(plot_name) << "point" << i << ".s ";
+			}
+			command_file << "B " << std::string(plot_name);
 		}
-		command_file << "r " << std::string(plot_name) << " ";
-		for (int i = 1; i < rays.size() + 1; ++i)
+		else
 		{
-			command_file << "u " << std::string(plot_name) << "point" << i << ".s ";
+			bu_log("fail to open/create file");
 		}
-		command_file << "B " << std::string(plot_name);
-	}
-	else
-	{
-		bu_log("fail to open/create file");
-	}
-	command_file.close();
-	std::ofstream draw_file;
-	draw_file.open("C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" + std::string(db_name) + ".bat");
-	if (draw_file.is_open())
-	{
-		draw_file << "@echo off" << std::endl;
-		draw_file << "cd \"C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\"" << std::endl;
-		draw_file << "mged.exe " << "\"C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\" + std::string(db_name) << ".g\"" << "<" << "\"C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" << std::string(db_name) << ".mged\"" << std::endl;
-		draw_file << "archer.exe " << "\"C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\" + std::string(db_name) << ".g\"";
-	}
-	else
-	{
-		bu_log("fail to open/create file");
+		command_file.close();
+		std::ofstream draw_file;
+		draw_file.open("C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" + std::string(db_name) + ".bat");
+		if (draw_file.is_open())
+		{
+			draw_file << "@echo off" << std::endl;
+			draw_file << "cd \"C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\"" << std::endl;
+			draw_file << "mged.exe " << "\"C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\" + std::string(db_name) << ".g\"" << "<" << "\"C:\\works\\soc\\rainy\\brlcad\\neu_build\\bin\\script\\" << std::string(db_name) << ".mged\"" << std::endl;
+			draw_file << "archer.exe " << "\"C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\" + std::string(db_name) << ".g\"";
+		}
+		else
+		{
+			bu_log("fail to open/create file");
+		}
 	}
 }
-
 namespace rt_sample
 {
 	double RandomNum(double a, double b)

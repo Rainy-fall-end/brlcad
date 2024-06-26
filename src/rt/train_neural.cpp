@@ -44,7 +44,14 @@ int main(int argc, char* argv[])
 	test.push_back(std::make_pair(p3, dir));*/
 	// test = rt_sample::SampleRandom(10);
 
-	test = rt_sample::UniformSphere(100);
-	create_plot("moss", test,"all_points1.g");
+	test = rt_sample::SampleRandom(100);
+	util::create_plot("moss", test,"all_points2.g");
+	point_t rt_p1 = { 232.98318264408485, 17.129209479118760, -13.872954520341105 };
+	vect_t rt_r1 = { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 };
+	point_t rt_p2 = { 151.95860058527862, 111.99263490737854, 11.775405151166122 };
+	vect_t rt_r2 = { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 };
+	RGBpixel res;
+	rt_tool::do_ray(rt_p1, rt_r1, res);
+	rt_tool::do_ray(rt_p2, rt_r2, res);
 	return 0;
 }

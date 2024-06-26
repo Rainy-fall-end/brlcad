@@ -53,8 +53,17 @@ extern "C"
 		initialize_option_defaults(void);
 	extern void
 		initialize_resources(size_t cnt, struct resource* resp, struct rt_i* rtip);
-}
+	extern void
+		view_2init(struct application* ap, char* UNUSED(framename));
 
+}
+namespace rt_tool
+{
+	extern "C"
+	{
+		extern void do_ray(point_t start, vect_t dir, RGBpixel rgb);
+	}
+}
 typedef std::vector<std::pair< std::vector<fastf_t>, std::vector<fastf_t>>> RayParam;
 class TrainData
 {
@@ -69,7 +78,10 @@ private:
 	std::vector<bool> m_res;
 };
 
-void create_plot(const char* db_name, const RayParam& rays, const char* plot_name);
+namespace util
+{
+	void create_plot(const char* db_name, const RayParam& rays, const char* plot_name);
+}
 namespace rt_sample
 {
 	// generate a random number between begin and end
