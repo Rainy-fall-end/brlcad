@@ -15,6 +15,7 @@
 #include <string>
 #include <random>
 #include "./ext.h"
+#include "nlohmann/json.hpp"
 
 /***** Variables shared with viewing model *** */
 struct fb* fbp = FB_NULL;	/* Framebuffer handle */
@@ -103,27 +104,26 @@ TrainData::TrainData(const char* database_name, const char* object_name)
 	view_2init(&APP, "");
 }
 
-std::vector<RGBpixel> TrainData::ShootSamples(const RayParam& ray_list) {
-	struct application ap;
-
-	RT_APPLICATION_INIT(&ap);
-	ap.a_rt_i = this->m_rt_i;
-	ap.a_hit = colorview;
-
-	std::vector<RGBpixel> res;
-
-	return res;
-}
-
-void TrainData::ClearRes()
-{
-	m_res.clear();
-}
+//std::vector<RGBdata> TrainData::ShootSamples(const RayParam& ray_list) {
+//	std::vector<RGBdata> res;
+//	point_t point{ 0 };
+//	vect_t dir{ 0 };
+//	RGBpixel pix{ 0 };
+//	for (auto const & ray : ray_list) 
+//	{
+//		VSET(point,ray.first[0],ray.first[1],ray.first[2]);
+//		VSET(dir, ray.second[0], ray.second[1], ray.second[2]);
+//		rt_tool::do_ray(point, dir, pix);
+//		res.push_back(util::pix_to_rgb(pix));
+//	}
+//	return res;
+//}
 
 TrainData::~TrainData() 
 {
 	fb_close(fbp);
 }
+
 namespace util
 {
 	void create_plot(const char* db_name, const RayParam& rays, const char* plot_name)
@@ -165,7 +165,17 @@ namespace util
 			bu_log("fail to open/create file");
 		}
 	}
+
+	RGBdata pix_to_rgb(RGBpixel data)
+	{
+		RGBdata res;
+		res[0] = data[0];
+		res[1] = data[1];
+		res[2] = data[2];
+		return res;
+	}
 }
+
 namespace rt_sample
 {
 	double RandomNum(double a, double b)
@@ -259,6 +269,82 @@ namespace rt_sample
 			d[1] /= square_sum;
 			d[2] /= square_sum;
 			res.push_back(std::make_pair(p, d));
+		}
+		return res;
+	}
+}
+
+namespace rt_tool
+{
+	void init_rt(const char* database_name, const char* object_name, struct rt_i* rtip)
+	{
+		char idbuf[2048] = { 0 };	/* First ID record info */
+
+		initialize_option_defaults();
+		/* global application context */
+		RT_APPLICATION_INIT(&APP);
+		/* Before option processing, do RTUIF app-specific init */
+		application_init();
+		APP.a_logoverlap = ((void (*)(struct application*, const struct partition*, const struct bu_ptbl*, const struct partition*))0);
+
+		if ((rtip = rt_dirbuild(database_name, idbuf, sizeof(idbuf))) == RTI_NULL) {
+			bu_exit(2, "Error building dir in train neural!\n");
+		}
+		APP.a_rt_i = rtip;
+		/* If user gave no sizing info at all, use 512 as default */
+		if (width <= 0 && cell_width <= 0)
+			width = 512;
+		if (height <= 0 && cell_height <= 0)
+			height = 512;
+		/* Copy values from command line options into rtip */
+		APP.a_rt_i->rti_space_partition = space_partition;
+		APP.a_rt_i->useair = use_air;
+		APP.a_rt_i->rti_save_overlaps = save_overlaps;
+		if (rt_dist_tol > 0) {
+			APP.a_rt_i->rti_tol.dist = rt_dist_tol;
+			APP.a_rt_i->rti_tol.dist_sq = rt_dist_tol * rt_dist_tol;
+		}
+		if (rt_perp_tol > 0) {
+			APP.a_rt_i->rti_tol.perp = rt_perp_tol;
+			APP.a_rt_i->rti_tol.para = 1 - rt_perp_tol;
+		}
+		if (rt_verbosity & VERBOSE_TOLERANCE)
+			rt_pr_tol(&APP.a_rt_i->rti_tol);
+
+		/* before view_init */
+		if (outputfile && BU_STR_EQUAL(outputfile, "-"))
+			outputfile = (char*)0;
+		grid_sync_dimensions(viewsize);
+
+		/* per-CPU preparation */
+		initialize_resources(sizeof(resource) / sizeof(struct resource), resource, rtip);
+
+		def_tree(APP.a_rt_i);
+		const char* trees[] = { "all.g" };
+		rt_gettrees(APP.a_rt_i, 1, trees, (size_t)npsw);
+
+		view_init(&APP, (char*)database_name, (char*)object_name, outputfile != (char*)0, framebuffer != (char*)0);
+
+		do_ae(azimuth, elevation);
+		int fb_status = fb_setup();
+		if (fb_status) {
+			fb_log("fail to open fb");
+			return;
+		}
+		do_prep(rtip);
+		view_2init(&APP, "");
+	}
+	std::vector<RGBdata> ShootSamples(const RayParam& ray_list) {
+		std::vector<RGBdata> res;
+		point_t point{ 0 };
+		vect_t dir{ 0 };
+		RGBpixel pix{ 0 };
+		for (auto const& ray : ray_list)
+		{
+			VSET(point, ray.first[0], ray.first[1], ray.first[2]);
+			VSET(dir, ray.second[0], ray.second[1], ray.second[2]);
+			rt_tool::do_ray(point, dir, pix);
+			res.push_back(util::pix_to_rgb(pix));
 		}
 		return res;
 	}

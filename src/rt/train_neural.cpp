@@ -26,32 +26,20 @@ int main(int argc, char* argv[])
 {
 	const char* db = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";
 	const char* ob = "all.g";
-
-	TrainData td(db, ob);
-	vect_t dir = { 1,0,0 };
-	
-	point_t p1 = { 1,1,1 };
-
-	point_t p2 = { 1,2,1 };
-
-	point_t p3 = { 1,1,2 };
-
-	RayParam test;
-	/*test.push_back(std::make_pair(p1, dir));
-
-	test.push_back(std::make_pair(p2, dir));
-
-	test.push_back(std::make_pair(p3, dir));*/
-	// test = rt_sample::SampleRandom(10);
-
-	test = rt_sample::SampleRandom(100);
-	util::create_plot("moss", test,"all_points2.g");
+	struct rt_i* rtip = NULL;
+	rt_tool::init_rt(db, ob, rtip);
+	// test for do_ray
 	point_t rt_p1 = { 232.98318264408485, 17.129209479118760, -13.872954520341105 };
 	vect_t rt_r1 = { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 };
 	point_t rt_p2 = { 151.95860058527862, 111.99263490737854, 11.775405151166122 };
 	vect_t rt_r2 = { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 };
 	RGBpixel res;
+	// res should be 0 0 1
 	rt_tool::do_ray(rt_p1, rt_r1, res);
+	// res should be 23 44 68
 	rt_tool::do_ray(rt_p2, rt_r2, res);
+	// test for shoot_sample
+	auto ray_list = rt_sample::SampleSphere(50);
+	auto ray_res = rt_tool::ShootSamples(ray_list);
 	return 0;
 }

@@ -21,6 +21,7 @@
 #define RT_RT_TRAINER_H
 #include<vmath.h>
 #include<vector>
+#include<array>
 #include<dm.h>
 extern "C"
 {
@@ -57,37 +58,47 @@ extern "C"
 		view_2init(struct application* ap, char* UNUSED(framename));
 
 }
+
+
+using RayParam = std::vector<std::pair< std::vector<fastf_t>, std::vector<fastf_t>>>;
+using RGBdata = std::array<int, 3>;
+
 namespace rt_tool
 {
 	extern "C"
 	{
 		extern void do_ray(point_t start, vect_t dir, RGBpixel rgb);
 	}
+	void init_rt(const char* database_name, const char* object_name, struct rt_i* rtip);
+	std::vector<RGBdata> ShootSamples(const RayParam& ray_list);
 }
-typedef std::vector<std::pair< std::vector<fastf_t>, std::vector<fastf_t>>> RayParam;
+
 class TrainData
 {
 public:
 	TrainData(struct rt_i* rtip);
 	TrainData(const char* database_name, const char* object_name);
-	std::vector<RGBpixel> ShootSamples(const RayParam& ray_list);
-	void ClearRes();
+	// std::vector<RGBdata> ShootSamples(const RayParam& ray_list);
 	~TrainData();
 private:
 	struct rt_i* m_rt_i;
-	std::vector<bool> m_res;
 };
 
 namespace util
 {
 	void create_plot(const char* db_name, const RayParam& rays, const char* plot_name);
+	// convert data from RGBpixel to RGBData
+	RGBdata pix_to_rgb(RGBpixel data);
 }
 namespace rt_sample
 {
 	// generate a random number between begin and end
 	double RandomNum(double begin, double end);
+	// generate random datas randomly
 	RayParam SampleRandom(size_t num);
+	// generate random datas randomly within a sphere
 	RayParam SampleSphere(size_t num);
+	// generate uniform datas within on a sphere
 	RayParam UniformSphere(size_t num);
 }
 #endif // !RT_RT_TRAINER_H
