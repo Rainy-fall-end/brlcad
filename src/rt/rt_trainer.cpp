@@ -3,7 +3,7 @@
 #include"rt/rt_trainer.h"
 #include"rt/application.h"
 #include "raytrace.h"
-
+#include "rt/torch_runner.h"
 #include "vmath.h"
 #include "icv.h"
 #include "bu/cv.h"
@@ -15,10 +15,7 @@
 #include <string>
 #include <random>
 #include "./ext.h"
-#include "nlohmann/json.hpp"
-
 /***** Variables shared with viewing model *** */
-struct fb* fbp = FB_NULL;	/* Framebuffer handle */
 
 
 struct soltab* kut_soltab = NULL;
@@ -30,99 +27,8 @@ vect_t ambient_color = { 1, 1, 1 };	/* Ambient white light */
 int ibackground[3] = { 0 };		/* integer 0..255 version */
 int inonbackground[3] = { 0 };		/* integer non-background */
 fastf_t gamma_corr = 0.0;		/* gamma correction if !0 */
+const std::string model_path = "C:\\works\\soc\\rainy\\test\\model.pt";
 
-TrainData::TrainData(struct rt_i* rtip) : m_rt_i(rtip) 
-{
-	char idbuf[2048] = { 0 };	/* First ID record info */
-
-	if (width <= 0 && cell_width <= 0)
-		width = 512;
-	if (height <= 0 && cell_height <= 0)
-		height = 512;
-	int fb_status = fb_setup();
-	if (fb_status) {
-		fb_log("fail to open fb");
-	}
-}
-
-TrainData::TrainData(const char* database_name, const char* object_name)
-{
-	char idbuf[2048] = { 0 };	/* First ID record info */
-
-	initialize_option_defaults();
-	/* global application context */
-	RT_APPLICATION_INIT(&APP);
-	/* Before option processing, do RTUIF app-specific init */
-	application_init();
-	APP.a_logoverlap = ((void (*)(struct application*, const struct partition*, const struct bu_ptbl*, const struct partition*))0);
-
-	if ((this->m_rt_i = rt_dirbuild(database_name, idbuf, sizeof(idbuf))) == RTI_NULL) {
-		bu_exit(2, "Error building dir in train neural!\n");
-	}
-	APP.a_rt_i = this->m_rt_i;
-	/* If user gave no sizing info at all, use 512 as default */
-	if (width <= 0 && cell_width <= 0)
-		width = 512;
-	if (height <= 0 && cell_height <= 0)
-		height = 512;
-	/* Copy values from command line options into rtip */
-	APP.a_rt_i->rti_space_partition = space_partition;
-	APP.a_rt_i->useair = use_air;
-	APP.a_rt_i->rti_save_overlaps = save_overlaps;
-	if (rt_dist_tol > 0) {
-		APP.a_rt_i->rti_tol.dist = rt_dist_tol;
-		APP.a_rt_i->rti_tol.dist_sq = rt_dist_tol * rt_dist_tol;
-	}
-	if (rt_perp_tol > 0) {
-		APP.a_rt_i->rti_tol.perp = rt_perp_tol;
-		APP.a_rt_i->rti_tol.para = 1 - rt_perp_tol;
-	}
-	if (rt_verbosity & VERBOSE_TOLERANCE)
-		rt_pr_tol(&APP.a_rt_i->rti_tol);
-
-	/* before view_init */
-	if (outputfile && BU_STR_EQUAL(outputfile, "-"))
-		outputfile = (char*)0;
-	grid_sync_dimensions(viewsize);
-
-	/* per-CPU preparation */
-	initialize_resources(sizeof(resource) / sizeof(struct resource), resource, this->m_rt_i);
-
-	def_tree(APP.a_rt_i);
-	const char* trees[] = { "all.g" };
-	rt_gettrees(APP.a_rt_i, 1, trees, (size_t)npsw);
-
-	view_init(&APP, (char*)database_name, (char*)object_name, outputfile != (char*)0, framebuffer != (char*)0);
-
-	do_ae(azimuth, elevation);
-	int fb_status = fb_setup();
-	if (fb_status) {
-		fb_log("fail to open fb");
-		return;
-	}
-	do_prep(this->m_rt_i);
-	view_2init(&APP, "");
-}
-
-//std::vector<RGBdata> TrainData::ShootSamples(const RayParam& ray_list) {
-//	std::vector<RGBdata> res;
-//	point_t point{ 0 };
-//	vect_t dir{ 0 };
-//	RGBpixel pix{ 0 };
-//	for (auto const & ray : ray_list) 
-//	{
-//		VSET(point,ray.first[0],ray.first[1],ray.first[2]);
-//		VSET(dir, ray.second[0], ray.second[1], ray.second[2]);
-//		rt_tool::do_ray(point, dir, pix);
-//		res.push_back(util::pix_to_rgb(pix));
-//	}
-//	return res;
-//}
-
-TrainData::~TrainData() 
-{
-	fb_close(fbp);
-}
 
 namespace util
 {
@@ -173,6 +79,26 @@ namespace util
 		res[1] = data[1];
 		res[2] = data[2];
 		return res;
+	}
+
+	void write_json(const RayParam& para, const Rayres& res, const char* path)
+	{
+		json js_res = json::array();
+		for (int i = 0; i < para.size(); i++)
+		{
+			json single_res = json::object();
+			single_res["point"] = para[i].first;
+			single_res["dir"] = para[i].second;
+			single_res["rgb"] = res[i];
+			js_res.push_back(single_res);
+		}
+		/*json para_json(para);
+		json res_json(res);
+		json j;
+		j["para"] = para_json;
+		j["res"] = res;*/
+		std::ofstream o(path);
+		o << js_res;
 	}
 }
 
@@ -272,6 +198,21 @@ namespace rt_sample
 		}
 		return res;
 	}
+	RayParam RangeFixVec(size_t num, fastf_t max, fastf_t min, std::vector<fastf_t> vec)
+	{
+		RayParam res;
+		std::vector<fastf_t> p;
+		std::vector<fastf_t> d = vec;
+		for (int i = 0; i < num; ++i)
+		{
+			p.clear();
+			p.push_back(RandomNum(min, max));
+			p.push_back(RandomNum(min, max));
+			p.push_back(RandomNum(min, max));
+			res.push_back(std::make_pair(p, d));
+		}
+		return res;
+	}
 }
 
 namespace rt_tool
@@ -334,8 +275,8 @@ namespace rt_tool
 		do_prep(rtip);
 		view_2init(&APP, "");
 	}
-	std::vector<RGBdata> ShootSamples(const RayParam& ray_list) {
-		std::vector<RGBdata> res;
+	Rayres ShootSamples(const RayParam& ray_list) {
+		Rayres res;
 		point_t point{ 0 };
 		vect_t dir{ 0 };
 		RGBpixel pix{ 0 };
@@ -347,5 +288,16 @@ namespace rt_tool
 			res.push_back(util::pix_to_rgb(pix));
 		}
 		return res;
+	}
+}
+
+namespace rt_neu
+{
+	void render()
+	{
+		do_frame(curframe);
+		if (fbp != FB_NULL) {
+			fb_close(fbp);
+		}
 	}
 }

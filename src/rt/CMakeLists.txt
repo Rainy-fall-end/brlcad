@@ -52,13 +52,40 @@ if(NOT TORCHVISION_FOUND)
     execute_process(COMMAND ${Python_EXECUTABLE} -m pip install torchvision)
 endif()
 
+# 设置 Torch 的路径
+set(Torch_DIR "C:/lib/VS/libtorch/share/cmake/Torch")
+set(Torch_INCLUDE_DIRS "C:/lib/VS/libtorch/include")
+set(Torch_INCLUDE_LIBS "C:/lib/VS/libtorch/lib")
+include_directories(${Torch_INCLUDE_DIRS})
+find_package(Torch REQUIRED)
+add_library(torch_runner STATIC torch_runner.cpp)
+
+target_link_libraries(torch_runner "${TORCH_LIBRARIES}")
+target_include_directories(torch_runner BEFORE PRIVATE
+  ${CMAKE_SOURCE_DIR}/include/analyze
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
+# 如果是 MSVC，添加后期构建命令以复制 DLL 文件
+if (MSVC)
+  file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
+  add_custom_command(TARGET torch_runner
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     ${TORCH_DLLS}
+                     $<TARGET_FILE_DIR:torch_runner>)
+endif (MSVC)
+target_include_directories(torch_runner PRIVATE
+    ${CMAKE_SOURCE_DIR}/include/analyze
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 BRLCAD_ADDEXEC(rt_trainneural "view.c;grid.c;heatgraph.c;scanline.c;opt.c;do.c;worker.c;usage.cpp;rt_neural.cpp;rt_trainer.cpp;train_neural.cpp;neural.c;../libanalyze/util.cpp;" "Threads::Threads;librt;libdm;libnmg;libdm;liboptical;libicv;liboptical;libicv;${Python_LIBRARIES};${RT_STD_LIBS};${OPEN_CL_LIBS}" FOLDER Rt)
-target_include_directories(rt_trainneural PRIVATE
+target_include_directories(rt_trainneural BEFORE PRIVATE
     ${CMAKE_SOURCE_DIR}/include/analyze
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 ADD_TARGET_DEPS(rt_trainneural dm_plugins dm-txt)
+target_link_libraries(rt_trainneural torch_runner "${TORCH_LIBRARIES}" )
 
 BRLCAD_ADDEXEC(reshoot "reshoot.c" "Threads::Threads;librt;libdm;liboptical;libicv" FOLDER Rt)
 target_include_directories(reshoot BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

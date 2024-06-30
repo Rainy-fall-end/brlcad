@@ -19,10 +19,12 @@
  */
 #ifndef RT_RT_TRAINER_H
 #define RT_RT_TRAINER_H
+
 #include<vmath.h>
 #include<vector>
 #include<array>
 #include<dm.h>
+#include "nlohmann/json.hpp"
 extern "C"
 {
 	extern int curframe;		/* from main.c */
@@ -30,7 +32,7 @@ extern "C"
 	extern double haze[3];		/* from opt.c */
 	extern int do_kut_plane;        /* from opt.c */
 	extern plane_t kut_plane;       /* from opt.c */
-
+	extern struct fb* fbp;
 	extern fastf_t	rt_dist_tol;		/* Value for rti_tol.dist */
 	extern fastf_t	rt_perp_tol;		/* Value for rti_tol.perp */
 	/***** variables from neural.c *****/
@@ -48,6 +50,8 @@ extern "C"
 	/***** variables from do.c *****/
 	extern void
 		do_prep(struct rt_i* rtip);
+	extern int
+		do_frame(int framenumber);
 	/***** variables from neural.c *****/
 	extern int fb_setup(void);
 	extern void
@@ -56,12 +60,14 @@ extern "C"
 		initialize_resources(size_t cnt, struct resource* resp, struct rt_i* rtip);
 	extern void
 		view_2init(struct application* ap, char* UNUSED(framename));
-
+	extern void set_size(int size);
 }
-
+const std::string global_model_path;
 
 using RayParam = std::vector<std::pair< std::vector<fastf_t>, std::vector<fastf_t>>>;
 using RGBdata = std::array<int, 3>;
+using Rayres = std::vector<RGBdata>;
+using json = nlohmann::json;
 
 namespace rt_tool
 {
@@ -70,26 +76,18 @@ namespace rt_tool
 		extern void do_ray(point_t start, vect_t dir, RGBpixel rgb);
 	}
 	void init_rt(const char* database_name, const char* object_name, struct rt_i* rtip);
-	std::vector<RGBdata> ShootSamples(const RayParam& ray_list);
+	Rayres ShootSamples(const RayParam& ray_list);
 }
-
-class TrainData
-{
-public:
-	TrainData(struct rt_i* rtip);
-	TrainData(const char* database_name, const char* object_name);
-	// std::vector<RGBdata> ShootSamples(const RayParam& ray_list);
-	~TrainData();
-private:
-	struct rt_i* m_rt_i;
-};
 
 namespace util
 {
+	// write a mged script
 	void create_plot(const char* db_name, const RayParam& rays, const char* plot_name);
 	// convert data from RGBpixel to RGBData
-	RGBdata pix_to_rgb(RGBpixel data);
+	RGBdata pix_to_rgb(const RGBpixel data);
+	void write_json(const RayParam& para, const Rayres& res, const char* path);
 }
+
 namespace rt_sample
 {
 	// generate a random number between begin and end
@@ -100,5 +98,11 @@ namespace rt_sample
 	RayParam SampleSphere(size_t num);
 	// generate uniform datas within on a sphere
 	RayParam UniformSphere(size_t num);
+	RayParam RangeFixVec(size_t num,fastf_t max, fastf_t min, std::vector<fastf_t> vec);
+}
+namespace rt_neu
+{
+	// begin neural rendering
+	void render();
 }
 #endif // !RT_RT_TRAINER_H

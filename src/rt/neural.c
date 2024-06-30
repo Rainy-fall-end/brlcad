@@ -33,8 +33,8 @@
 #include "./rtuif.h"
 #include "./ext.h"
 #include "brlcad_ident.h"
-
-
+#include "scanline.h"
+#include "rt/torch_runner.h"
 /***** Variables shared with viewing model *** */
 struct fb* fbp = FB_NULL;	/* Framebuffer handle */
 FILE* outfp = NULL;		/* optional pixel output file */
@@ -78,6 +78,8 @@ extern int ibackground[3];		/* integer 0..255 version */
 extern int inonbackground[3];		/* integer non-background */
 extern fastf_t gamma_corr;		/* gamma correction if !0 */
 /***** end variables shared with view.c *****/
+static struct scanline* scanline = NULL;
+static size_t pwidth = 0;		/* Width of each pixel (in bytes) */
 void
 memory_summary(void)
 {
@@ -636,4 +638,14 @@ void do_ray(point_t start,vect_t dir, RGBpixel rgb)
 	(void)rt_shootray(&a);
 	/* we're done */
 	cal_rgb(&a, rgb);
+}
+
+
+void set_size(int size)
+{
+	width = size;
+	height = size;
+	grid_sync_dimensions(viewsize);
+	if (!orientflag)
+		do_ae(azimuth, elevation);
 }

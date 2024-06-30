@@ -78,7 +78,6 @@ int cur_pixel = 0;			/* current pixel number, 0..last_pixel */
 int last_pixel = 0;			/* last pixel number */
 
 int stop_worker = 0;
-
 /**
  * For certain hypersample values there is a particular advantage to
  * subdividing the pixel and shooting a ray in each sub-pixel.  This
@@ -443,7 +442,9 @@ do_pixel(int cpu, int pat_num, int pixelnum)
     }
 
     /* we're done */
-    view_pixel(&a);
+    // view_pixel(&a);
+	// view_pixel_neu(&a);
+	view_pixel_test(&a);
     if ((size_t)a.a_x == width-1) {
 	view_eol(&a);		/* End of scan line */
     }
@@ -574,7 +575,7 @@ pat_found:
 		if (pixelnum > last_pixel || pixelnum < 0)
 		    return;
 
-		/* bu_log("    PIXEL[%d]\n", pixelnum); */
+		/*bu_log("    PIXEL[%d]\n", pixelnum);*/
 		do_pixel(cpu, pat_num, pixelnum);
 	    }
 	}

@@ -244,7 +244,7 @@ static void mpi_exit_func(void)
 int main(int argc, char *argv[])
 {
 	argv[1] = "-s";
-	argv[2] = "512";
+	argv[2] = "128";
 	argv[3] = "-P";
 	argv[4] = "1";
 	argv[5] = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";

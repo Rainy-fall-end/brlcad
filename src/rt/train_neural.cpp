@@ -22,24 +22,24 @@
   *
   */
 #include"rt/rt_trainer.h"
+#include "rt/torch_runner.h"
 int main(int argc, char* argv[])
 {
 	const char* db = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";
 	const char* ob = "all.g";
 	struct rt_i* rtip = NULL;
+	set_size(128);
 	rt_tool::init_rt(db, ob, rtip);
-	// test for do_ray
-	point_t rt_p1 = { 232.98318264408485, 17.129209479118760, -13.872954520341105 };
-	vect_t rt_r1 = { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 };
-	point_t rt_p2 = { 151.95860058527862, 111.99263490737854, 11.775405151166122 };
-	vect_t rt_r2 = { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 };
-	RGBpixel res;
-	// res should be 0 0 1
-	rt_tool::do_ray(rt_p1, rt_r1, res);
-	// res should be 23 44 68
-	rt_tool::do_ray(rt_p2, rt_r2, res);
-	// test for shoot_sample
-	auto ray_list = rt_sample::SampleSphere(50);
+#if 1
+	set_model_path("C:\\works\\soc\\rainy\\Rendernn\\model2.pt");
+	rt_neu::render();
+#endif
+
+# if 0
+	auto ray_list = rt_sample::RangeFixVec(1000000, 400, -100, { -0.742403865,-0.519836783,-0.422618270 });
 	auto ray_res = rt_tool::ShootSamples(ray_list);
+	// test for write json
+	util::write_json(ray_list, ray_res, "C:\\works\\soc\\rainy\\neural\\c.json");
+#endif
 	return 0;
 }
