@@ -38,8 +38,7 @@
 
 #include "./rtuif.h"
 #include "./ext.h"
-
-
+#include "rt/torch_runner.h"
 /* for fork/pipe linux timing hack */
 #ifdef USE_FORKED_THREADS
 #  include <sys/select.h>
@@ -89,7 +88,6 @@ struct jitter_pattern {
     double coords[32]; /* center of each sub-pixel */
 };
 
-
 static struct jitter_pattern pt_pats[] = {
 
     {4, {0.5, 0.5}, 	/* -H 3 */
@@ -119,7 +117,7 @@ static struct jitter_pattern pt_pats[] = {
     { 0, {0.0, 0.0}, {0.0} } /* must be here to stop search */
 };
 
-
+render_type rt_render_type = normal;
 /**
  * Compute the origin for this ray, based upon the number of samples
  * per pixel and the number of the current sample.  For certain
@@ -299,8 +297,29 @@ do_pixel(int cpu, int pat_num, int pixelnum)
 
 	a.a_level = 0;		/* recursion level */
 	a.a_purpose = "main ray";
-	(void)rt_shootray(&a);
-
+	if (rt_render_type == normal)
+	{
+		(void)rt_shootray(&a);
+		point_t colora;
+		VSET(colora, a.a_color[0],a.a_color[1],a.a_color[2]);
+		point_t center;
+		VSET(center, 20, 0, 19.5);
+		fastf_t p = hit_sphere(center, 108.13070794182381, &a.a_ray);
+		point_t new_point;
+		point_t dis;
+		VSCALE(dis, a.a_ray.r_dir, p);
+		VADD2(new_point, dis, a.a_ray.r_pt);
+		a.a_ray.r_pt[X] = new_point[X];
+		a.a_ray.r_pt[Y] = new_point[Z];
+		a.a_ray.r_pt[Z] = new_point[Z];
+		a.a_level = 0;
+		(void)rt_shootray(&a);
+		point_t colorb;
+		VSET(colorb, a.a_color[0], a.a_color[1], a.a_color[2]);
+		point_t colorc;
+		VSUB2(colorc, colora, colorb);
+		p = 0;
+	}
 	if (stereo) {
 	    fastf_t right, left;
 	    vect_t temp;
@@ -441,10 +460,22 @@ do_pixel(int cpu, int pat_num, int pixelnum)
 	bu_semaphore_release(RT_SEM_RESULTS);
     }
 
-    /* we're done */
-    // view_pixel(&a);
-	// view_pixel_neu(&a);
-	view_pixel_test(&a);
+		/* we're done */
+	switch (rt_render_type)
+	{
+	case normal:
+		view_pixel(&a);
+		break;
+	case neu_coordinate:
+		view_pixel_neu_coordinate(&a);
+		break;
+	case neu_sphere:
+		view_pixel_neu_sphere(&a);
+		break;
+	default:
+		break;
+	}
+	
     if ((size_t)a.a_x == width-1) {
 	view_eol(&a);		/* End of scan line */
     }

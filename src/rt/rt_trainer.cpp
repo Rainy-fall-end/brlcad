@@ -15,6 +15,7 @@
 #include <string>
 #include <random>
 #include "./ext.h"
+#include "rt/neu_util.h"
 /***** Variables shared with viewing model *** */
 
 
@@ -28,6 +29,48 @@ int ibackground[3] = { 0 };		/* integer 0..255 version */
 int inonbackground[3] = { 0 };		/* integer non-background */
 fastf_t gamma_corr = 0.0;		/* gamma correction if !0 */
 const std::string model_path = "C:\\works\\soc\\rainy\\test\\model.pt";
+
+
+namespace convert
+{
+	RGBdata pix_to_rgb(RGBpixel data)
+	{
+		RGBdata res;
+		res[0] = data[0];
+		res[1] = data[1];
+		res[2] = data[2];
+		return res;
+	}
+
+	RayParamSph cert_to_sph(RayParam& datas, point_t origin, fastf_t r)
+	{
+		RayParamSph res;
+		res.reserve(datas.size());
+		fastf_t elevation(0.0);
+		fastf_t azimuth(0.0);
+		fastf_t pelevation(0.0);
+		fastf_t pazimuth(0.0);
+		for (auto& data : datas)
+		{
+			fastf_t x = data.first[0] - origin[0];
+			fastf_t y = data.first[1] - origin[1];
+			fastf_t z = data.first[2] - origin[2];
+			elevation = acos(z / r);
+			azimuth = atan2(y , x);
+			if (pow(data.second[0], 2) + pow(data.second[1], 2) + pow(data.second[2], 2) != 1)
+			{
+				fastf_t square_sum = pow(pow(data.second[0], 2) + pow(data.second[1], 2) + pow(data.second[2], 2), 0.5);
+				data.second[0] /= square_sum;
+				data.second[1] /= square_sum;
+				data.second[2] /= square_sum;
+			}
+			pelevation = acos(data.second[2]);
+			azimuth = atan2(data.second[1] , data.second[0]);
+			res.push_back(std::make_pair(std::make_pair(elevation, azimuth), std::make_pair(pelevation, azimuth)));
+		}
+		return res;
+	}
+}
 
 
 namespace util
@@ -72,15 +115,6 @@ namespace util
 		}
 	}
 
-	RGBdata pix_to_rgb(RGBpixel data)
-	{
-		RGBdata res;
-		res[0] = data[0];
-		res[1] = data[1];
-		res[2] = data[2];
-		return res;
-	}
-
 	void write_json(const RayParam& para, const Rayres& res, const char* path)
 	{
 		json js_res = json::array();
@@ -92,13 +126,25 @@ namespace util
 			single_res["rgb"] = res[i];
 			js_res.push_back(single_res);
 		}
-		/*json para_json(para);
-		json res_json(res);
-		json j;
-		j["para"] = para_json;
-		j["res"] = res;*/
 		std::ofstream o(path);
 		o << js_res;
+		o.close();
+	}
+	
+	void write_sph_json(const RayParamSph& para, const Rayres& res, const char* path)
+	{
+		json js_res = json::array();
+		for (int i = 0; i < para.size(); i++)
+		{
+			json single_res = json::object();
+			single_res["point_sph"] = para[i].first;
+			single_res["dir_sph"] = para[i].second;
+			single_res["rgb"] = res[i];
+			js_res.push_back(single_res);
+		}
+		std::ofstream o(path);
+		o << js_res;
+		o.close();
 	}
 }
 
@@ -213,6 +259,26 @@ namespace rt_sample
 		}
 		return res;
 	}
+	RayParam SampleSphereFixVec(size_t num,std::vector<fastf_t> vec)
+	{
+		RayParam res;
+		point_t center{ 0 };
+		fastf_t radius = APP.a_rt_i->rti_radius;
+		VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
+		fastf_t square_sum(0);
+		std::vector<fastf_t> p;
+		std::vector<fastf_t> d = vec;
+		for (int i = 0; i < num; ++i) {
+			p.clear();
+			fastf_t theta = RandomNum(0, 2 * M_PI);
+			fastf_t phi = acos(2 * RandomNum(0, 1) - 1);
+			p.push_back(center[0] + radius * sin(phi) * cos(theta));
+			p.push_back(center[1] + radius * sin(phi) * sin(theta));
+			p.push_back(center[2] + radius * cos(phi));
+			res.push_back(std::make_pair(p, d));
+		}
+		return res;
+	}
 }
 
 namespace rt_tool
@@ -285,7 +351,7 @@ namespace rt_tool
 			VSET(point, ray.first[0], ray.first[1], ray.first[2]);
 			VSET(dir, ray.second[0], ray.second[1], ray.second[2]);
 			rt_tool::do_ray(point, dir, pix);
-			res.push_back(util::pix_to_rgb(pix));
+			res.push_back(convert::pix_to_rgb(pix));
 		}
 		return res;
 	}
@@ -301,3 +367,4 @@ namespace rt_neu
 		}
 	}
 }
+

@@ -87,6 +87,13 @@ extern void view_end(struct application *ap);
  */
 extern void view_cleanup(struct rt_i *rtip);
 
+extern void
+view_pixel_neu_coordinate(struct application* ap);
+
+extern void
+view_pixel_neu_sphere(struct application* ap);
+
+extern fastf_t hit_sphere(const point_t center, fastf_t radius, struct xray* ray);
 #endif  /* RT_RTUIF_H */
 /*
  * Local Variables:

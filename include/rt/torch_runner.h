@@ -10,6 +10,9 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
+typedef enum {
+    normal = 1,
+    neu_coordinate = 2,
+    neu_sphere = 3
+} render_type;
 #endif // !RT_TORCH_RUNNER_H
-

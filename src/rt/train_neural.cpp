@@ -21,25 +21,40 @@
   *
   *
   */
+
+#include "rt/neu_util.h"
 #include"rt/rt_trainer.h"
 #include "rt/torch_runner.h"
+#include "vmath.h"
+render_type rt_render_type;
 int main(int argc, char* argv[])
 {
+	fastf_t a = 74.49;
+	fastf_t b = -a;
 	const char* db = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";
 	const char* ob = "all.g";
 	struct rt_i* rtip = NULL;
-	set_size(128);
+	set_size(64);
 	rt_tool::init_rt(db, ob, rtip);
-#if 1
+	// do_ae(10, 10);
+	//rt_perspective = 90;
+#if 0
+	set_type(normal);
 	set_model_path("C:\\works\\soc\\rainy\\Rendernn\\model2.pt");
 	rt_neu::render();
 #endif
 
-# if 0
-	auto ray_list = rt_sample::RangeFixVec(1000000, 400, -100, { -0.742403865,-0.519836783,-0.422618270 });
+# if 1
+	// auto ray_list = rt_sample::RangeFixVec(100000, 400, -100, { -0.742403865,-0.519836783,-0.422618270 });
+	// auto ray_list = rt_sample::SampleRandom(1000);
+	auto ray_list = rt_sample::SampleSphereFixVec(10000, { -0.742403865,-0.519836783,-0.422618270 });
+	point_t center{ 0 };
+	get_center(center);
 	auto ray_res = rt_tool::ShootSamples(ray_list);
+	auto ray_list_sph = convert::cert_to_sph(ray_list, center, get_r());
 	// test for write json
-	util::write_json(ray_list, ray_res, "C:\\works\\soc\\rainy\\neural\\c.json");
+	// util::write_json(ray_list, ray_res, "C:\\works\\soc\\rainy\\neural\\c.json");
+	util::write_sph_json(ray_list_sph, ray_res, "C:\\works\\soc\\rainy\\Rendernn\\datas\\sph_1.json");
 #endif
 	return 0;
 }

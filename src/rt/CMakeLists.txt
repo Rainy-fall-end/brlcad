@@ -65,7 +65,6 @@ target_include_directories(torch_runner BEFORE PRIVATE
   ${CMAKE_SOURCE_DIR}/include/analyze
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
-# 如果是 MSVC，添加后期构建命令以复制 DLL 文件
 if (MSVC)
   file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
   add_custom_command(TARGET torch_runner

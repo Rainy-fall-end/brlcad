@@ -61,7 +61,7 @@
 
 #include "./rtuif.h"
 #include "./ext.h"
-
+#include "rt/torch_runner.h"
 
 extern struct fb *fbp;			/* Framebuffer handle */
 
@@ -527,7 +527,7 @@ view_pixel(struct application *ap)
 
 
 void
-view_pixel_test(struct application* ap)
+view_pixel_neu_coordinate(struct application* ap)
 {
 	int r, g, b;
 	unsigned char* pixelp;
@@ -549,56 +549,6 @@ view_pixel_test(struct application* ap)
 	bu_semaphore_release(BU_SEM_SYSCALL);
 #endif
 
-	if (ap->a_user == 0) {
-		/* Shot missed the model, don't dither */
-		r = ibackground[0];
-		g = ibackground[1];
-		b = ibackground[2];
-		VSETALL(ap->a_color, -1e-20);	/* background flag */
-	}
-	else {
-		/*
-		 * To prevent bad color aliasing, add some color dither.  Be
-		 * certain to NOT output the background color here.  Random
-		 * numbers in the range 0 to 1 are used, so that integer
-		 * valued colors (e.g., from texture maps) retain their original
-		 * values.
-		 */
-		if (!ZERO(gamma_corr)) {
-			/*
-			 * Perform gamma correction in floating-point space, and
-			 * avoid nasty mach bands in dark areas from doing it in
-			 * 0..255 space later.
-			 */
-			double ex = 1.0 / gamma_corr;
-			r = floor(pow(ap->a_color[0], ex) * 255. +
-				bn_rand0to1(ap->a_resource->re_randptr) + 0.5);
-			g = floor(pow(ap->a_color[1], ex) * 255. +
-				bn_rand0to1(ap->a_resource->re_randptr) + 0.5);
-			b = floor(pow(ap->a_color[2], ex) * 255. +
-				bn_rand0to1(ap->a_resource->re_randptr) + 0.5);
-		}
-		else {
-			r = ap->a_color[0] * 255. + bn_rand0to1(ap->a_resource->re_randptr);
-			g = ap->a_color[1] * 255. + bn_rand0to1(ap->a_resource->re_randptr);
-			b = ap->a_color[2] * 255. + bn_rand0to1(ap->a_resource->re_randptr);
-		}
-		if (r > 255) r = 255;
-		else if (r < 0) r = 0;
-		if (g > 255) g = 255;
-		else if (g < 0) g = 0;
-		if (b > 255) b = 255;
-		else if (b < 0) b = 0;
-		if (r == ibackground[0] && g == ibackground[1] &&
-			b == ibackground[2]) {
-			r = inonbackground[0];
-			g = inonbackground[1];
-			b = inonbackground[2];
-		}
-		/* Make sure it's never perfect black */
-		if (r == 0 && g == 0 && b == 0 && benchmark == 0)
-			b = 1;
-	}
 	ap->a_user = 1;
 	double para[6];
 	para[0] = ap->a_ray.r_pt[0];
@@ -899,53 +849,236 @@ view_pixel_test(struct application* ap)
 	}
 }
 
+
 void
-view_pixel_neu(struct application* ap)
+view_pixel_neu_sphere(struct application* ap)
 {
 	int r, g, b;
 	unsigned char* pixelp;
 	struct scanline* slp;
 	int do_eol = 0;
-	int res[3] = { 0 };
-	if (ap->a_user == 0) {
-		/* Shot missed the model, don't dither */
-		r = ibackground[0];
-		g = ibackground[1];
-		b = ibackground[2];
-		VSETALL(ap->a_color, -1e-20);	/* background flag */
-	}
-	else
-	{
-		double para[6];
-		para[0] = ap->a_ray.r_pt[0];
-		para[1] = ap->a_ray.r_pt[1];
-		para[2] = ap->a_ray.r_pt[2];
-		para[3] = ap->a_ray.r_dir[0];
-		para[4] = ap->a_ray.r_dir[1];
-		para[5] = ap->a_ray.r_dir[2];
 
-		
-		// run_torch(para, res);
-		r = res[0];
-		g = res[1];
-		b = res[2];
-		
-	}
+	ap->a_user = 1;
+	double para[6];
+
+	para[0] = ap->a_ray.r_pt[0];
+	para[1] = ap->a_ray.r_pt[1];
+	para[2] = ap->a_ray.r_pt[2];
+	para[3] = ap->a_ray.r_dir[0];
+	para[4] = ap->a_ray.r_dir[1];
+	para[5] = ap->a_ray.r_dir[2];
+	int res[3] = { 0 };
+	run_torch(para, res);
+
+	r = res[0];
+	g = res[1];
+	b = res[2];
+
 	if (OPTICAL_DEBUG & OPTICAL_DEBUG_HITS) bu_log("rgb=%3d, %3d, %3d xy=%3d, %3d (%g, %g, %g)\n",
 		r, g, b, ap->a_x, ap->a_y,
 		V3ARGS(ap->a_color));
 
-	slp = &scanline[ap->a_y];
-	if (slp->sl_buf == (unsigned char*)0) {
-		slp->sl_buf = (unsigned char*)bu_calloc(width, pwidth, "sl_buf scanline buffer");
-	}
-	pixelp = slp->sl_buf + (ap->a_x * pwidth);
+	switch (buf_mode) {
 
-	*pixelp++ = r;
-	*pixelp++ = g;
-	*pixelp++ = b;
-	if (--(slp->sl_left) <= 0)
-		do_eol = 1;
+	case BUFMODE_FULLFLOAT:
+	{
+		/* No output semaphores required for word-width memory
+		 * writes.
+		 */
+		struct floatpixel* fp;
+		fp = &curr_float_frame[ap->a_y * width + ap->a_x];
+		fp->ff_frame = curframe;
+		fp->ff_color[0] = r;
+		fp->ff_color[1] = g;
+		fp->ff_color[2] = b;
+		fp->ff_x = ap->a_x;
+		fp->ff_y = ap->a_y;
+		if (ap->a_user == 0) {
+			fp->ff_dist = -INFINITY;	/* shot missed model */
+			fp->ff_frame = -1;		/* Don't cache misses */
+			return;
+		}
+		/* XXX a_dist is negative and misleading when eye is in air */
+		fp->ff_dist = (float)ap->a_dist;
+		VJOIN1(fp->ff_hitpt, ap->a_ray.r_pt,
+			ap->a_dist, ap->a_ray.r_dir);
+		fp->ff_regp = (struct region*)ap->a_uptr;
+		RT_CK_REGION(fp->ff_regp);
+		/*
+		 * This pixel was just computed.  Look at next pixel
+		 * on scanline, and if it is a reprojected old value
+		 * and hit a different region than this pixel, then
+		 * recompute it too.
+		 */
+		if ((size_t)ap->a_x >= width - 1)
+			return;
+		if (fp[1].ff_frame <= 0)
+			return;	/* not valid, will be recomputed. */
+		if (fp[1].ff_regp == fp->ff_regp)
+			return;				/* OK */
+
+		/* Next pixel is probably out of date, mark it for
+		 * re-computing
+		 */
+		fp[1].ff_frame = -1;
+		return;
+	}
+
+	case BUFMODE_UNBUF:
+	{
+		RGBpixel p;
+		int npix;
+
+		p[0] = r;
+		p[1] = g;
+		p[2] = b;
+
+		if (bif != NULL) {
+			icv_writepixel(bif, ap->a_x, ap->a_y, ap->a_color);
+		}
+		else if (outfp != NULL) {
+			bu_semaphore_acquire(BU_SEM_SYSCALL);
+			if (bu_fseek(outfp, (ap->a_y * width * pwidth) + (ap->a_x * pwidth), 0) != 0)
+				fprintf(stderr, "fseek error\n");
+			if (fwrite(p, 3, 1, outfp) != 1)
+				bu_exit(EXIT_FAILURE, "pixel fwrite error");
+			bu_semaphore_release(BU_SEM_SYSCALL);
+		}
+
+		if (fbp != FB_NULL) {
+			/* Framebuffer output */
+			bu_semaphore_acquire(BU_SEM_SYSCALL);
+			npix = fb_write(fbp, ap->a_x, ap->a_y,
+				(const unsigned char*)p, 1);
+			bu_semaphore_release(BU_SEM_SYSCALL);
+			if (npix < 1)
+				bu_exit(EXIT_FAILURE, "pixel fb_write error");
+		}
+	}
+	return;
+
+#ifdef RTSRV
+	case BUFMODE_RTSRV:
+		/* Multi-pixel buffer */
+		pixelp = scanbuf + pwidth * ((ap->a_y * width) + ap->a_x - srv_startpix);
+		bu_semaphore_acquire(RT_SEM_RESULTS);
+		*pixelp++ = r;
+		*pixelp++ = g;
+		*pixelp++ = b;
+		bu_semaphore_release(RT_SEM_RESULTS);
+		return;
+#endif
+
+		/*
+		 * Store results into pixel buffer.  Don't depend on
+		 * interlocked hardware byte-splice.  Need to protect
+		 * scanline[].sl_left when in parallel mode.
+		 */
+
+	case BUFMODE_DYNAMIC:
+		slp = &scanline[ap->a_y];
+		bu_semaphore_acquire(RT_SEM_RESULTS);
+		if (slp->sl_buf == (unsigned char*)0) {
+			slp->sl_buf = (unsigned char*)bu_calloc(width, pwidth, "sl_buf scanline buffer");
+		}
+		pixelp = slp->sl_buf + (ap->a_x * pwidth);
+		*pixelp++ = r;
+		*pixelp++ = g;
+		*pixelp++ = b;
+		if (--(slp->sl_left) <= 0)
+			do_eol = 1;
+		bu_semaphore_release(RT_SEM_RESULTS);
+		break;
+
+		/*
+		 * Only one CPU is working on this scanline, no parallel
+		 * interlock required! Much faster.
+		 */
+	case BUFMODE_SCANLINE:
+		slp = &scanline[ap->a_y];
+		if (slp->sl_buf == (unsigned char*)0) {
+			slp->sl_buf = (unsigned char*)bu_calloc(width, pwidth, "sl_buf scanline buffer");
+		}
+		pixelp = slp->sl_buf + (ap->a_x * pwidth);
+		*pixelp++ = r;
+		*pixelp++ = g;
+		*pixelp++ = b;
+		if (--(slp->sl_left) <= 0)
+			do_eol = 1;
+		break;
+
+	case BUFMODE_INCR:
+	{
+		size_t dx, dy;
+		size_t spread;
+
+		spread = 1 << (incr_nlevel - incr_level);
+
+		bu_semaphore_acquire(RT_SEM_RESULTS);
+		for (dy = 0; dy < spread; dy++) {
+			if ((size_t)ap->a_y + dy >= height) break;
+			slp = &scanline[ap->a_y + dy];
+			if (slp->sl_buf == (unsigned char*)0)
+				slp->sl_buf = (unsigned char*)bu_calloc(width + 32,
+					pwidth, "sl_buf scanline buffer");
+
+			pixelp = slp->sl_buf + (ap->a_x * pwidth);
+			for (dx = 0; dx < spread; dx++) {
+				*pixelp++ = r;
+				*pixelp++ = g;
+				*pixelp++ = b;
+			}
+		}
+		/* First 3 incremental iterations are boring */
+		if (incr_level > 3) {
+			if (--(scanline[ap->a_y].sl_left) <= 0)
+				do_eol = 1;
+		}
+		bu_semaphore_release(RT_SEM_RESULTS);
+	}
+	break;
+
+	case BUFMODE_ACC:
+	{
+		unsigned int i;
+		fastf_t* psum_p;
+		fastf_t* tmp_pixel;
+		int tmp_color;
+
+		/* Scanline buffered mode */
+		bu_semaphore_acquire(RT_SEM_RESULTS);
+
+		tmp_pixel = (fastf_t*)bu_calloc(pwidth, sizeof(fastf_t), "tmp_pixel");
+		VMOVE(tmp_pixel, ap->a_color);
+
+		psum_p = &psum_buffer[ap->a_y * width * pwidth + ap->a_x * pwidth];
+		slp = &scanline[ap->a_y];
+		if (slp->sl_buf == (unsigned char*)0) {
+			slp->sl_buf = (unsigned char*)bu_calloc(width, pwidth, "sl_buf scanline buffer");
+		}
+		pixelp = slp->sl_buf + (ap->a_x * pwidth);
+		/* Update the partial sums and the scanline */
+		for (i = 0; i < pwidth; i++) {
+			psum_p[i] += tmp_pixel[i];
+			/* change the float interval to [0, 255] and round to
+			   the nearest integer */
+			tmp_color = psum_p[i] * 255.0 / full_incr_sample + 0.5;
+			/* clamp */
+			pixelp[i] = tmp_color < 0 ? 0 : tmp_color > 255 ? 255 : tmp_color;
+		}
+		bu_free(tmp_pixel, "tmp_pixel");
+
+		bu_semaphore_release(RT_SEM_RESULTS);
+		if (--(slp->sl_left) <= 0)
+			do_eol = 1;
+	}
+	break;
+
+	default:
+		bu_exit(EXIT_FAILURE, "bad buf_mode: %d", buf_mode);
+	}
+
+
 	if (!do_eol)
 		return;
 
@@ -1024,7 +1157,6 @@ view_pixel_neu(struct application* ap)
 		bu_free(scanline[ap->a_y].sl_buf, "sl_buf scanline buffer");
 		scanline[ap->a_y].sl_buf = (unsigned char*)0;
 	}
-
 }
 
 /**

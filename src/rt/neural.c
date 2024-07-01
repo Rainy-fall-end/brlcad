@@ -35,6 +35,7 @@
 #include "brlcad_ident.h"
 #include "scanline.h"
 #include "rt/torch_runner.h"
+
 /***** Variables shared with viewing model *** */
 struct fb* fbp = FB_NULL;	/* Framebuffer handle */
 FILE* outfp = NULL;		/* optional pixel output file */
@@ -48,6 +49,7 @@ struct application APP;
 int		report_progress;	/* !0 = user wants progress report */
 extern int	incr_mode;		/* !0 for incremental resolution */
 extern size_t	incr_nlevel;		/* number of levels */
+extern render_type rt_render_type;
 /***** end variables shared with worker() *****/
 
 
@@ -518,7 +520,6 @@ neu_do_frame(int framenumber)
     return 0;		/* OK */
 }
 
-
 static int
 validate_raytrace(struct rt_i* rtip)
 {
@@ -537,7 +538,6 @@ validate_raytrace(struct rt_i* rtip)
 
 	return 0;
 }
-
 
 static void cal_rgb(struct application* ap, RGBpixel rgb)
 {
@@ -599,7 +599,6 @@ static void cal_rgb(struct application* ap, RGBpixel rgb)
 	rgb[2] = b;
 }
 
-
 void do_ray(point_t start,vect_t dir, RGBpixel rgb)
 {
 	int cpu = 0;
@@ -640,7 +639,6 @@ void do_ray(point_t start,vect_t dir, RGBpixel rgb)
 	cal_rgb(&a, rgb);
 }
 
-
 void set_size(int size)
 {
 	width = size;
@@ -648,4 +646,37 @@ void set_size(int size)
 	grid_sync_dimensions(viewsize);
 	if (!orientflag)
 		do_ae(azimuth, elevation);
+}
+
+void get_center(point_t center)
+{
+	VSETALL(center, 0.0);
+	VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
+}
+
+fastf_t get_r()
+{
+	return APP.a_rt_i->rti_radius;
+}
+
+void set_type(render_type type)
+{
+	rt_render_type = type;
+}
+
+fastf_t hit_sphere(const point_t center, fastf_t radius, struct xray* ray)
+{
+	point_t dict;
+	VSUB2(dict, ray->r_pt, center);
+	fastf_t a = VDOT(ray->r_dir, ray->r_dir);
+	fastf_t b = VDOT(ray->r_dir, dict);
+	fastf_t c = VDOT(dict, dict) - radius * radius;
+	fastf_t discriminate = b * b - a * c;
+	if (discriminate < 0)
+		return -1.0f;
+	else
+	{
+		return (( - 1) * b+ (-1)*pow(discriminate, 0.5)) / a;
+	}
+	return -1.0f;
 }
