@@ -66,6 +66,7 @@ extern "C"
 	extern void get_center(point_t center);
 	extern fastf_t get_r();
 	extern void set_type(render_type type);
+	extern fastf_t hit_sphere(const point_t center, fastf_t radius, struct xray* ray);
 }
 
 const std::string global_model_path;
@@ -83,6 +84,8 @@ namespace convert
 	RayParamSph cert_to_sph(RayParam& datas, point_t origin, fastf_t r);
 	// convert data from RGBpixel to RGBData
 	RGBdata pix_to_rgb(const RGBpixel data);
+	// convert a single point from Cartesian to spherical
+	void cert_to_sph_point(point_t point, point_t origin, fastf_t r, point2d_t res);
 }
 
 

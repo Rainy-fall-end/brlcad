@@ -550,15 +550,16 @@ view_pixel_neu_coordinate(struct application* ap)
 #endif
 
 	ap->a_user = 1;
-	double para[6];
-	para[0] = ap->a_ray.r_pt[0];
-	para[1] = ap->a_ray.r_pt[1];
-	para[2] = ap->a_ray.r_pt[2];
-	para[3] = ap->a_ray.r_dir[0];
-	para[4] = ap->a_ray.r_dir[1];
-	para[5] = ap->a_ray.r_dir[2];
+	double para[7];
+	para[0] = 2;
+	para[1] = ap->a_ray.r_pt[0];
+	para[2] = ap->a_ray.r_pt[1];
+	para[3] = ap->a_ray.r_pt[2];
+	para[4] = ap->a_ray.r_dir[0];
+	para[5] = ap->a_ray.r_dir[1];
+	para[6] = ap->a_ray.r_dir[2];
 	int res[3] = { 0 };
-	run_torch(para, res);
+	run_torch(para, res, 1);
 
 	r = res[0];
 	g = res[1];
@@ -858,21 +859,31 @@ view_pixel_neu_sphere(struct application* ap)
 	struct scanline* slp;
 	int do_eol = 0;
 
-	ap->a_user = 1;
-	double para[6];
+	point_t center;
+	VSETALL(center, 0.0);
+	VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
+	fastf_t intersection =  hit_sphere(center, ap->a_rt_i->rti_radius, &ap->a_ray);
+	if (intersection == -1.0f)
+	{
+		ap->a_user = 0;
+		r = background[0];
+		g = background[1];
+		b = background[2];
+	}
+	else
+	{
+		ap->a_user = 1;
+		double para[5];
+		para[0] = 3;
+		cert_to_sph_p(para, ap->a_ray.r_pt, ap->a_ray.r_dir, intersection);
+		int res[3] = { 0 };
+		run_torch(para, res);
+		r = res[0];
+		g = res[1];
+		b = res[2];
+	}
 
-	para[0] = ap->a_ray.r_pt[0];
-	para[1] = ap->a_ray.r_pt[1];
-	para[2] = ap->a_ray.r_pt[2];
-	para[3] = ap->a_ray.r_dir[0];
-	para[4] = ap->a_ray.r_dir[1];
-	para[5] = ap->a_ray.r_dir[2];
-	int res[3] = { 0 };
-	run_torch(para, res);
 
-	r = res[0];
-	g = res[1];
-	b = res[2];
 
 	if (OPTICAL_DEBUG & OPTICAL_DEBUG_HITS) bu_log("rgb=%3d, %3d, %3d xy=%3d, %3d (%g, %g, %g)\n",
 		r, g, b, ap->a_x, ap->a_y,

@@ -300,25 +300,6 @@ do_pixel(int cpu, int pat_num, int pixelnum)
 	if (rt_render_type == normal)
 	{
 		(void)rt_shootray(&a);
-		point_t colora;
-		VSET(colora, a.a_color[0],a.a_color[1],a.a_color[2]);
-		point_t center;
-		VSET(center, 20, 0, 19.5);
-		fastf_t p = hit_sphere(center, 108.13070794182381, &a.a_ray);
-		point_t new_point;
-		point_t dis;
-		VSCALE(dis, a.a_ray.r_dir, p);
-		VADD2(new_point, dis, a.a_ray.r_pt);
-		a.a_ray.r_pt[X] = new_point[X];
-		a.a_ray.r_pt[Y] = new_point[Z];
-		a.a_ray.r_pt[Z] = new_point[Z];
-		a.a_level = 0;
-		(void)rt_shootray(&a);
-		point_t colorb;
-		VSET(colorb, a.a_color[0], a.a_color[1], a.a_color[2]);
-		point_t colorc;
-		VSUB2(colorc, colora, colorb);
-		p = 0;
 	}
 	if (stereo) {
 	    fastf_t right, left;

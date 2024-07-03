@@ -680,3 +680,25 @@ fastf_t hit_sphere(const point_t center, fastf_t radius, struct xray* ray)
 	}
 	return -1.0f;
 }
+
+
+// for param convert
+void cert_to_sph_p(fastf_t* para, point_t pt, vect_t dir,fastf_t intersection)
+{
+	point_t new_point;
+	point_t dis;
+	VSET(new_point, 0, 0, 0);
+	VSET(dis, 0, 0, 0);
+	VSCALE(dis, dir, intersection);
+	VADD2(new_point, pt, dis);
+	point_t center;
+	get_center(center);
+	fastf_t x = pt[0] - center[0];
+	fastf_t y = pt[1] - center[1];
+	fastf_t z = pt[2] - center[2];
+	para[1] = acos(z / get_r());
+	para[2] = atan2(y, x);
+	VUNITIZE(dir);
+	para[3] = acos(dir[2]);
+	para[4] = atan2(dir[1],dir[0]);
+}

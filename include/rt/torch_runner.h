@@ -1,6 +1,11 @@
 #ifndef RT_TORCH_RUNNER_H
 #define RT_TORCH_RUNNER_H
 void set_model_path(const char* model_path);
+typedef enum {
+    normal = 1,
+    neu_coordinate = 2,
+    neu_sphere = 3
+} render_type;
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -10,9 +15,5 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-typedef enum {
-    normal = 1,
-    neu_coordinate = 2,
-    neu_sphere = 3
-} render_type;
+
 #endif // !RT_TORCH_RUNNER_H

@@ -46,8 +46,12 @@ namespace rt_sample
 	RayParam SampleSphere(size_t num);
 	// generate uniform datas within on a sphere
 	RayParam UniformSphere(size_t num);
+	// generate datas with random points and fix vec
 	RayParam RangeFixVec(size_t num,fastf_t max, fastf_t min, std::vector<fastf_t> vec);
+	// generate datas with random points and fix vec on sphere surface
 	RayParam SampleSphereFixVec(size_t num, std::vector<fastf_t> vec);
+	// generate datas with random points and fix vec on sphere surface, rays are forced to hit sphere
+	RayParam SampleSphereFixVecHit(size_t num, std::vector < fastf_t> vec);
 }
 
 namespace rt_neu

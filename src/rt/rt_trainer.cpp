@@ -31,7 +31,7 @@ fastf_t gamma_corr = 0.0;		/* gamma correction if !0 */
 const std::string model_path = "C:\\works\\soc\\rainy\\test\\model.pt";
 
 
-namespace convert
+namespace convert	
 {
 	RGBdata pix_to_rgb(RGBpixel data)
 	{
@@ -69,6 +69,17 @@ namespace convert
 			res.push_back(std::make_pair(std::make_pair(elevation, azimuth), std::make_pair(pelevation, azimuth)));
 		}
 		return res;
+	}
+	
+	void cert_to_sph_point(point_t point, point_t origin, fastf_t r, point2d_t res)
+	{
+
+		fastf_t x = point[0] - origin[0];
+		fastf_t y = point[1] - origin[1];
+		fastf_t z = point[2] - origin[2];
+		assert(r >= abs(z));
+		res[0] = acos(z / r);
+		res[1] = atan2(y, x);
 	}
 }
 
@@ -265,7 +276,6 @@ namespace rt_sample
 		point_t center{ 0 };
 		fastf_t radius = APP.a_rt_i->rti_radius;
 		VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
-		fastf_t square_sum(0);
 		std::vector<fastf_t> p;
 		std::vector<fastf_t> d = vec;
 		for (int i = 0; i < num; ++i) {
@@ -275,6 +285,33 @@ namespace rt_sample
 			p.push_back(center[0] + radius * sin(phi) * cos(theta));
 			p.push_back(center[1] + radius * sin(phi) * sin(theta));
 			p.push_back(center[2] + radius * cos(phi));
+			res.push_back(std::make_pair(p, d));
+		}
+		return res;
+	}
+	RayParam SampleSphereFixVecHit(size_t num, std::vector < fastf_t> vec)
+	{
+		RayParam res;
+		point_t center{ 0 }, random_point{ 0 };
+		fastf_t radius = APP.a_rt_i->rti_radius;
+		VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
+		std::vector<fastf_t> p;
+		std::vector<fastf_t> d = vec;
+		xray ray;
+		VMOVE(ray.r_dir, vec);
+		for (int i = 0; i < num; ++i) {
+			fastf_t theta = RandomNum(0, 2 * M_PI);
+			fastf_t phi = acos(2 * RandomNum(0, 1) - 1);
+			fastf_t x = center[0] + radius * sin(phi) * cos(theta);
+			fastf_t y = center[1] + radius * sin(phi) * sin(theta);
+			fastf_t z = center[2] + radius * cos(phi);
+			if (hit_sphere(center, radius, &ray) == -1.0f)
+			{
+				i--;
+				continue;
+			}
+			p.clear();
+			VSET(p, x, y, z);
 			res.push_back(std::make_pair(p, d));
 		}
 		return res;
