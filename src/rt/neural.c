@@ -693,12 +693,13 @@ void cert_to_sph_p(fastf_t* para, point_t pt, vect_t dir,fastf_t intersection)
 	VADD2(new_point, pt, dis);
 	point_t center;
 	get_center(center);
-	fastf_t x = pt[0] - center[0];
-	fastf_t y = pt[1] - center[1];
-	fastf_t z = pt[2] - center[2];
-	para[1] = acos(z / get_r());
-	para[2] = atan2(y, x);
+	fastf_t x = new_point[0] - center[0];
+	fastf_t y = new_point[1] - center[1];
+	fastf_t z = new_point[2] - center[2];
+	double r = get_r();
+	para[1] = acos(z / r);
+	para[2] = SIGN(y) * acos(x / (r * sin(para[1])));
 	VUNITIZE(dir);
 	para[3] = acos(dir[2]);
-	para[4] = atan2(dir[1],dir[0]);
+	para[4] = SIGN(dir[1]) * acos(dir[0] / (1 * sin(para[3])));
 }

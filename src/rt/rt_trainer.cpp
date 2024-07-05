@@ -55,8 +55,10 @@ namespace convert
 			fastf_t x = data.first[0] - origin[0];
 			fastf_t y = data.first[1] - origin[1];
 			fastf_t z = data.first[2] - origin[2];
-			elevation = acos(z / r);
-			azimuth = atan2(y , x);
+			fastf_t z_abs = abs(z);
+			fastf_t r_abs = abs(r);
+			elevation = acos(z / r); //0-pi
+			azimuth = SIGN(y)*acos(x / (r * sin(elevation))); //-pi-pi
 			if (pow(data.second[0], 2) + pow(data.second[1], 2) + pow(data.second[2], 2) != 1)
 			{
 				fastf_t square_sum = pow(pow(data.second[0], 2) + pow(data.second[1], 2) + pow(data.second[2], 2), 0.5);
@@ -65,8 +67,8 @@ namespace convert
 				data.second[2] /= square_sum;
 			}
 			pelevation = acos(data.second[2]);
-			azimuth = atan2(data.second[1] , data.second[0]);
-			res.push_back(std::make_pair(std::make_pair(elevation, azimuth), std::make_pair(pelevation, azimuth)));
+			pazimuth = SIGN(data.second[1]) * acos(data.second[0] / (1 * sin(pelevation)));
+			res.push_back(std::make_pair(std::make_pair(elevation, azimuth), std::make_pair(pelevation, pazimuth)));
 		}
 		return res;
 	}
@@ -79,7 +81,7 @@ namespace convert
 		fastf_t z = point[2] - origin[2];
 		assert(r >= abs(z));
 		res[0] = acos(z / r);
-		res[1] = atan2(y, x);
+		res[1] = SIGN(y) * acos(x / (r * sin(res[0])));
 	}
 }
 
@@ -280,16 +282,16 @@ namespace rt_sample
 		std::vector<fastf_t> d = vec;
 		for (int i = 0; i < num; ++i) {
 			p.clear();
-			fastf_t theta = RandomNum(0, 2 * M_PI);
-			fastf_t phi = acos(2 * RandomNum(0, 1) - 1);
-			p.push_back(center[0] + radius * sin(phi) * cos(theta));
-			p.push_back(center[1] + radius * sin(phi) * sin(theta));
-			p.push_back(center[2] + radius * cos(phi));
+			fastf_t theta = RandomNum(0, M_PI);
+			fastf_t phi = RandomNum(-M_PI, M_PI);
+			p.push_back(center[0] + radius * sin(theta) * cos(phi));
+			p.push_back(center[1] + radius * sin(theta) * sin(phi));
+			p.push_back(center[2] + radius * cos(theta));
 			res.push_back(std::make_pair(p, d));
 		}
 		return res;
 	}
-	RayParam SampleSphereFixVecHit(size_t num, std::vector < fastf_t> vec)
+	RayParam SampleFixVecHit(size_t num, std::vector < fastf_t> vec)
 	{
 		RayParam res;
 		point_t center{ 0 }, random_point{ 0 };
@@ -297,21 +299,42 @@ namespace rt_sample
 		VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
 		std::vector<fastf_t> p;
 		std::vector<fastf_t> d = vec;
-		xray ray;
-		VMOVE(ray.r_dir, vec);
+		vect_t center_v;
 		for (int i = 0; i < num; ++i) {
-			fastf_t theta = RandomNum(0, 2 * M_PI);
-			fastf_t phi = acos(2 * RandomNum(0, 1) - 1);
-			fastf_t x = center[0] + radius * sin(phi) * cos(theta);
-			fastf_t y = center[1] + radius * sin(phi) * sin(theta);
-			fastf_t z = center[2] + radius * cos(phi);
-			if (hit_sphere(center, radius, &ray) == -1.0f)
+			p = std::vector<fastf_t>(3,0);
+			fastf_t theta = RandomNum(0, M_PI);
+			fastf_t phi = RandomNum(-M_PI, M_PI);
+			VSET(p, center[0] + radius * sin(phi) * cos(theta), center[1] + radius * sin(phi) * sin(theta), center[2] + radius * cos(phi));
+			VSUB2(center_v, center, p);
+			if (VDOT(center_v, vec) <= 0)
 			{
 				i--;
 				continue;
 			}
+			res.push_back(std::make_pair(p, d));
+		}
+		return res;
+	}
+	RayParam RangeFixVecHit(size_t num, fastf_t max, fastf_t min, std::vector < fastf_t> vec)
+	{
+		RayParam res;
+		point_t center{ 0 }, random_point{ 0 };
+		fastf_t radius = APP.a_rt_i->rti_radius;
+		VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
+		std::vector<fastf_t> p;
+		std::vector<fastf_t> d = vec;
+		vect_t center_v;
+		for (int i = 0; i < num; ++i) {
 			p.clear();
-			VSET(p, x, y, z);
+			fastf_t theta = RandomNum(0, 2 * M_PI);
+			fastf_t phi = acos(2 * RandomNum(0, 1) - 1);
+			VSET(p, center[0] + radius * sin(phi) * cos(theta), center[1] + radius * sin(phi) * sin(theta), center[2] + radius * cos(phi));
+			VSUB2(center_v, center, p);
+			if (VDOT(center_v, vec) <= 0)
+			{
+				i--;
+				continue;
+			}
 			res.push_back(std::make_pair(p, d));
 		}
 		return res;

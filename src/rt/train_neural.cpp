@@ -34,27 +34,30 @@ int main(int argc, char* argv[])
 	const char* db = "C:\\works\\soc\\rainy\\brlcad\\build\\share\\db\\moss.g";
 	const char* ob = "all.g";
 	struct rt_i* rtip = NULL;
-	set_size(256);
+	set_size(64);
 	rt_tool::init_rt(db, ob, rtip);
 	// do_ae(10, 10);
 	//rt_perspective = 90;
+
 #if 1
-	set_type(normal);
-	set_model_path("C:\\works\\soc\\rainy\\Rendernn\\models\\model_sph3.pt");
+	set_type(neu_sphere);
+	set_model_path("C:\\works\\soc\\rainy\\Rendernn\\models\\model_sph5.pt");
 	rt_neu::render();
 #endif
 
 # if 0
 	// auto ray_list = rt_sample::RangeFixVec(100000, 400, -100, { -0.742403865,-0.519836783,-0.422618270 });
 	// auto ray_list = rt_sample::SampleRandom(1000);
-	auto ray_list = rt_sample::SampleSphereFixVec(100000, { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 });
+	// auto ray_list = rt_sample::SampleFixVecHit(100000, { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 });
+	// auto ray_list = rt_sample::RangeFixVecHit(1000, 100,-100,{ -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 });
+	auto ray_list = rt_sample::SampleFixVecHit(1000000, { -0.74240387650610373, -0.51983679072568467, -0.42261826174069961 });
 	point_t center{ 0 };
 	get_center(center);
 	auto ray_res = rt_tool::ShootSamples(ray_list);
 	auto ray_list_sph = convert::cert_to_sph(ray_list, center, get_r());
 	// test for write json
-	// util::write_json(ray_list, ray_res, "C:\\works\\soc\\rainy\\neural\\c.json");
-	util::write_sph_json(ray_list_sph, ray_res, "C:\\works\\soc\\rainy\\Rendernn\\datas\\sph_3.json");
+	// util::write_json(ray_list, ray_res, "C:\\works\\soc\\rainy\\Rendernn\\datas\\e.json");
+	util::write_sph_json(ray_list_sph, ray_res, "C:\\works\\soc\\rainy\\Rendernn\\datas\\sph_6.json");
 #endif
 	return 0;
 }

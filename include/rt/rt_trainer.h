@@ -51,7 +51,9 @@ namespace rt_sample
 	// generate datas with random points and fix vec on sphere surface
 	RayParam SampleSphereFixVec(size_t num, std::vector<fastf_t> vec);
 	// generate datas with random points and fix vec on sphere surface, rays are forced to hit sphere
-	RayParam SampleSphereFixVecHit(size_t num, std::vector < fastf_t> vec);
+	RayParam SampleFixVecHit(size_t num, std::vector < fastf_t> vec);
+	// generate datas with random points fix range and fix vec on sphere surface, rays are forced to hit sphere
+	RayParam RangeFixVecHit(size_t num, fastf_t max, fastf_t min, std::vector < fastf_t> vec);
 }
 
 namespace rt_neu

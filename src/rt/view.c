@@ -243,7 +243,6 @@ view_pixel(struct application *ap)
 	if (r==0 && g==0 && b==0 && benchmark==0)
 	    b = 1;
     }
-
     if (OPTICAL_DEBUG&OPTICAL_DEBUG_HITS) bu_log("rgb=%3d, %3d, %3d xy=%3d, %3d (%g, %g, %g)\n",
 						 r, g, b, ap->a_x, ap->a_y,
 						 V3ARGS(ap->a_color));
@@ -876,6 +875,7 @@ view_pixel_neu_sphere(struct application* ap)
 		double para[5];
 		para[0] = 3;
 		cert_to_sph_p(para, ap->a_ray.r_pt, ap->a_ray.r_dir, intersection);
+		// bu_log("%f,%f\n",para[1],para[2]);
 		int res[3] = { 0 };
 		run_torch(para, res);
 		r = res[0];
