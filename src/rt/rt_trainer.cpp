@@ -28,7 +28,6 @@ vect_t ambient_color = { 1, 1, 1 };	/* Ambient white light */
 int ibackground[3] = { 0 };		/* integer 0..255 version */
 int inonbackground[3] = { 0 };		/* integer non-background */
 fastf_t gamma_corr = 0.0;		/* gamma correction if !0 */
-const std::string model_path = "C:\\works\\soc\\rainy\\test\\model.pt";
 
 
 namespace convert	
@@ -46,10 +45,10 @@ namespace convert
 	{
 		RayParamSph res;
 		res.reserve(datas.size());
-		fastf_t elevation(0.0);
-		fastf_t azimuth(0.0);
-		fastf_t pelevation(0.0);
-		fastf_t pazimuth(0.0);
+		fastf_t theta;
+		fastf_t phi;
+		fastf_t ptheta;
+		fastf_t pphi;
 		for (auto& data : datas)
 		{
 			fastf_t x = data.first[0] - origin[0];
@@ -57,8 +56,9 @@ namespace convert
 			fastf_t z = data.first[2] - origin[2];
 			fastf_t z_abs = abs(z);
 			fastf_t r_abs = abs(r);
-			elevation = acos(z / r); //0-pi
-			azimuth = SIGN(y)*acos(x / (r * sin(elevation))); //-pi-pi
+
+			theta = acos(z / r); //0-pi
+			phi = SIGN(y)*acos(x / (r * sin(theta))); //-pi-pi
 			if (pow(data.second[0], 2) + pow(data.second[1], 2) + pow(data.second[2], 2) != 1)
 			{
 				fastf_t square_sum = pow(pow(data.second[0], 2) + pow(data.second[1], 2) + pow(data.second[2], 2), 0.5);
@@ -66,9 +66,9 @@ namespace convert
 				data.second[1] /= square_sum;
 				data.second[2] /= square_sum;
 			}
-			pelevation = acos(data.second[2]);
-			pazimuth = SIGN(data.second[1]) * acos(data.second[0] / (1 * sin(pelevation)));
-			res.push_back(std::make_pair(std::make_pair(elevation, azimuth), std::make_pair(pelevation, pazimuth)));
+			ptheta = acos(data.second[2]);
+			pphi = SIGN(data.second[1]) * acos(data.second[0] / (1 * sin(ptheta)));
+			res.push_back(std::make_pair(std::make_pair(theta,phi), std::make_pair(ptheta, pphi)));
 		}
 		return res;
 	}
@@ -197,7 +197,7 @@ namespace rt_sample
 		}
 		return res;
 	}
-	RayParam SampleSphere(size_t num)
+	RayParam SampleSphereFixhit(size_t num)
 	{
 		RayParam res;
 		point_t center{ 0 };
@@ -206,21 +206,28 @@ namespace rt_sample
 		fastf_t square_sum(0);
 		std::vector<fastf_t> p;
 		std::vector<fastf_t> d;
+		vect_t center_v;
 		for (int i = 0; i < num; ++i) {
 			p.clear();
 			d.clear();
-			fastf_t theta = RandomNum(0, 2 * M_PI); 
-			fastf_t phi = acos(2 * RandomNum(0, 1) - 1); 
-			p.push_back(center[0] + radius * sin(phi) * cos(theta));
-			p.push_back(center[1] + radius * sin(phi) * sin(theta));
-			p.push_back(center[2] + radius * cos(phi));
-			d.push_back(center[0] - p[0]);
-			d.push_back(center[1] - p[1]);
-			d.push_back(center[2] - p[2]);
+			fastf_t theta = RandomNum(0, M_PI);
+			fastf_t phi = RandomNum(-M_PI, M_PI);
+			p.push_back(center[0] + radius * sin(theta) * cos(phi));
+			p.push_back(center[1] + radius * sin(theta) * sin(phi));
+			p.push_back(center[2] + radius * cos(theta));
+			d.push_back(RandomNum(0, 1));
+			d.push_back(RandomNum(0, 1));
+			d.push_back(RandomNum(0, 1));
 			square_sum = pow(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2), 0.5);
 			d[0] /= square_sum;
 			d[1] /= square_sum;
 			d[2] /= square_sum;
+			VSUB2(center_v, center, p);
+			if (VDOT(center_v, d) <= 0)
+			{
+				i--;
+				continue;
+			}
 			res.push_back(std::make_pair(p, d));
 		}
 		return res;
@@ -315,22 +322,30 @@ namespace rt_sample
 		}
 		return res;
 	}
-	RayParam RangeFixVecHit(size_t num, fastf_t max, fastf_t min, std::vector < fastf_t> vec)
+	RayParam RangeHit(size_t num, fastf_t max, fastf_t min)
 	{
 		RayParam res;
 		point_t center{ 0 }, random_point{ 0 };
 		fastf_t radius = APP.a_rt_i->rti_radius;
 		VADD2SCALE(center, APP.a_rt_i->rti_pmin, APP.a_rt_i->rti_pmax, 0.5);
 		std::vector<fastf_t> p;
-		std::vector<fastf_t> d = vec;
+		std::vector<fastf_t> d;
 		vect_t center_v;
+		fastf_t square_sum;
+		fastf_t theta;
+		fastf_t phi;
 		for (int i = 0; i < num; ++i) {
-			p.clear();
-			fastf_t theta = RandomNum(0, 2 * M_PI);
-			fastf_t phi = acos(2 * RandomNum(0, 1) - 1);
-			VSET(p, center[0] + radius * sin(phi) * cos(theta), center[1] + radius * sin(phi) * sin(theta), center[2] + radius * cos(phi));
+			p = std::vector<fastf_t>(3, 0);
+			d = std::vector<fastf_t>(3, 0);
+			theta = RandomNum(0,M_PI);
+			theta = theta == 0 ? 1e-5 : theta;
+			phi = RandomNum(-M_PI,M_PI);
+			fastf_t ptheta = RandomNum(0.5*M_PI, 0.85*M_PI);
+			fastf_t pphi = RandomNum(-0.85*M_PI, -0.5*M_PI);
+			VSET(p, center[0] + radius * sin(theta) * cos(phi), center[1] + radius * sin(theta) * sin(phi), center[2] + radius * cos(theta));
 			VSUB2(center_v, center, p);
-			if (VDOT(center_v, vec) <= 0)
+			VSET(d, 1 * sin(ptheta) * cos(pphi), 1 * sin(ptheta) * sin(pphi), 1 * cos(ptheta));
+			if (VDOT(center_v, d) <= 0)
 			{
 				i--;
 				continue;

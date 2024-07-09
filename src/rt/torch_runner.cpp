@@ -3,6 +3,7 @@
 #include "torch_runner.h"
 #include <iostream>
 std::string global_model_path;
+int model_type;
 typedef enum {
     normal = 1,
     neu_coordinate = 2,
@@ -11,6 +12,10 @@ typedef enum {
 void set_model_path(const char* model_path)
 {
     global_model_path = std::string(model_path);
+}
+void set_model_type(int num)
+{
+    model_type = num;
 }
 static torch::jit::script::Module& get_model() {
     static torch::jit::script::Module module;
@@ -49,16 +54,22 @@ void run_torch(double* para, int* res)
     else if (int(para[0]) == neu_sphere)
     {
         para++;
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)
         {
             input_vec.push_back(*para);
             para++;
         }
-        inputs.push_back(torch::tensor({ {input_vec[0], input_vec[1]} }, torch::kFloat).to(at::kCUDA));
+        if(model_type==2)
+            inputs.push_back(torch::tensor({ {input_vec[0], input_vec[1]} }, torch::kFloat).to(at::kCUDA));
+        else if (model_type == 4)
+        {
+            /*inputs.push_back(torch::tensor({ {input_vec[0], input_vec[1]} }, torch::kFloat).to(at::kCUDA));
+            inputs.push_back(torch::tensor({ {input_vec[2], input_vec[3]} }, torch::kFloat).to(at::kCUDA));*/
+            inputs.push_back(torch::tensor({ {input_vec[0], input_vec[1],input_vec[2], input_vec[3]} }, torch::kFloat).to(at::kCUDA));
+        }
     }
     // inputs.push_back(input_tensor);
     at::Tensor output = module.forward(inputs).toTensor().to(torch::kCPU);
-    auto tmp = output.data_ptr<float>();
     std::vector<double> output_vector(output.data_ptr<float>(), output.data_ptr<float>() + output.numel());
     res[0] = int(output_vector[0]);
     if (res[0] > 255)

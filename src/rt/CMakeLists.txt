@@ -52,7 +52,7 @@ if(NOT TORCHVISION_FOUND)
     execute_process(COMMAND ${Python_EXECUTABLE} -m pip install torchvision)
 endif()
 
-# 设置 Torch 的路径
+# set libTorch path
 set(Torch_DIR "C:/lib/VS/libtorch/share/cmake/Torch")
 set(Torch_INCLUDE_DIRS "C:/lib/VS/libtorch/include")
 set(Torch_INCLUDE_LIBS "C:/lib/VS/libtorch/lib")
