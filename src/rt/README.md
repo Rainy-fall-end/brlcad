@@ -3,6 +3,7 @@
 used for loading model
 do remember to change the absolute path in:src/rt/CMakeLists.txt Line 56-58
 [nlohmann](https://github.com/nlohmann/json)
+there is no need to install, it is just a "header-only" library
 used for write json file
 ## Project structure
 Add two projects:
